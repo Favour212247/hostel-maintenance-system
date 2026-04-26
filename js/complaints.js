@@ -88,6 +88,7 @@ function displayRecentComplaints(complaints) {
                 <span><i class="fas fa-calendar"></i> ${formatDate(complaint.createdAt)}</span>
                 <span><i class="fas fa-tag"></i> ${complaint.category}</span>
                 <span class="complaint-status status-${complaint.status}">${getStatusText(complaint.status)}</span>
+                ${complaint.assignedToName ? `<span><i class="fas fa-wrench"></i> Assigned to: ${escapeHtml(complaint.assignedToName)}</span>` : ''}
             </div>
             <div class="complaint-actions">
                 <button class="btn btn-small" onclick="viewComplaintDetails('${complaint.id}')"><i class="fas fa-eye"></i> View Details</button>
@@ -123,6 +124,7 @@ function displayAllComplaints(complaints) {
                 <span><i class="fas fa-calendar"></i> ${formatDate(complaint.createdAt)}</span>
                 <span><i class="fas fa-tag"></i> ${complaint.category}</span>
                 <span class="complaint-status status-${complaint.status}">${getStatusText(complaint.status)}</span>
+                ${complaint.assignedToName ? `<span><i class="fas fa-wrench"></i> ${escapeHtml(complaint.assignedToName)}</span>` : ''}
             </div>
             <div class="complaint-actions">
                 <button class="btn btn-small" onclick="viewComplaintDetails('${complaint.id}')"><i class="fas fa-eye"></i> View Details</button>
@@ -147,6 +149,7 @@ async function submitComplaint(event) {
         return;
     }
     
+    // ACO auto-detects priority - student cannot choose
     const autoPriority = detectAutoPriority(title, description, category);
     const autoRouting = determineAutoRouting(autoPriority, category, description);
     
@@ -158,11 +161,11 @@ async function submitComplaint(event) {
         return;
     }
     
-    const confirmMessage = `🔍 SYSTEM ANALYSIS RESULTS:\n\n` +
+    const confirmMessage = `🔍 ACO SYSTEM ANALYSIS RESULTS:\n\n` +
         `📋 Issue: ${title}\n` +
         `🏷️ Category: ${category}\n\n` +
-        `⚡ Detected Priority: ${getPriorityDisplay(autoPriority)}\n` +
-        `📍 Will be sent to: ${getRoutingDisplay(autoRouting)}\n\n` +
+        `⚡ ACO Detected Priority: ${getPriorityDisplay(autoPriority)}\n` +
+        `📍 Will be routed to: ${getRoutingDisplay(autoRouting)}\n\n` +
         `Click OK to submit complaint.`;
     
     if (!confirm(confirmMessage)) {
@@ -186,7 +189,7 @@ async function submitComplaint(event) {
             category: category,
             title: title,
             description: description,
-            priority: autoPriority,
+            priority: autoPriority,  // ACO auto-detected priority
             status: 'pending',
             directToAdmin: autoRouting === 'dsss' || autoRouting === 'dsss_vc',
             autoDetected: true,
@@ -197,7 +200,7 @@ async function submitComplaint(event) {
             imageDataUrl: imageDataUrl
         };
         
-        console.log('Submitting complaint:', complaintData);
+        console.log('Submitting complaint with ACO priority:', autoPriority);
         
         const docRef = await db.collection('complaints').add(complaintData);
         
@@ -217,17 +220,20 @@ async function submitComplaint(event) {
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
+        // ACO will automatically assign technicians (except emergencies)
         if (autoPriority !== 'emergency' && typeof allocateComplaint === 'function') {
             const newComplaint = { id: docRef.id, ...complaintData, zone: user.hostelBlock ? user.hostelBlock.charAt(0) : 'A' };
             await allocateComplaint(newComplaint);
         }
         
         const sentTo = getRoutingDisplay(autoRouting);
-        const sentToDisplay = document.getElementById('sentToDisplay');
-        if (sentToDisplay) sentToDisplay.textContent = sentTo;
         
         const successModal = document.getElementById('successModal');
-        if (successModal) successModal.style.display = 'flex';
+        if (successModal) {
+            const sentToDisplay = successModal.querySelector('#sentToDisplay');
+            if (sentToDisplay) sentToDisplay.textContent = sentTo;
+            successModal.style.display = 'flex';
+        }
         
         const complaintForm = document.getElementById('complaintForm');
         if (complaintForm) complaintForm.reset();
@@ -235,7 +241,7 @@ async function submitComplaint(event) {
         const fileNameSpan = document.getElementById('fileName');
         if (fileNameSpan) fileNameSpan.textContent = 'No file chosen';
         
-        showToast(`✅ Complaint submitted! Priority: ${autoPriority.toUpperCase()}`, 'success');
+        showToast(`✅ Complaint submitted! ACO Priority: ${autoPriority.toUpperCase()}`, 'success');
         
         setTimeout(() => {
             loadStudentComplaints();
@@ -279,12 +285,12 @@ async function viewComplaintDetails(complaintId) {
                 <p><strong>Complaint ID:</strong> #${complaint.id.slice(-6)}</p>
                 <p><strong>Title:</strong> ${escapeHtml(complaint.title)}</p>
                 <p><strong>Category:</strong> ${complaint.category}</p>
-                <p><strong>Priority:</strong> <span class="complaint-priority priority-${complaint.priority}">${complaint.priority.toUpperCase()}</span></p>
-                ${complaint.autoDetected ? `<p><strong>Auto-Detected:</strong> Yes (System analyzed content)</p>` : ''}
+                <p><strong>ACO Priority:</strong> <span class="complaint-priority priority-${complaint.priority}">${complaint.priority.toUpperCase()}</span></p>
+                ${complaint.autoDetected ? `<p><strong>ACO Analysis:</strong> Priority auto-detected by system</p>` : ''}
                 <p><strong>Status:</strong> <span class="complaint-status status-${complaint.status}">${getStatusText(complaint.status)}</span></p>
                 <p><strong>Description:</strong> ${escapeHtml(complaint.description)}</p>
                 <p><strong>Submitted:</strong> ${formatDate(complaint.createdAt)}</p>
-                ${complaint.assignedToName ? `<p><strong>Assigned To:</strong> ${escapeHtml(complaint.assignedToName)}</p>` : ''}
+                ${complaint.assignedToName ? `<p><strong>Assigned To (by ACO):</strong> ${escapeHtml(complaint.assignedToName)}</p>` : ''}
                 ${complaint.adminRemarks ? `<p><strong>Admin Remarks:</strong> ${escapeHtml(complaint.adminRemarks)}</p>` : ''}
                 ${complaint.imageDataUrl ? `<p><strong>Attached Image:</strong></p><img src="${complaint.imageDataUrl}" style="max-width: 100%; border-radius: 8px; margin-top: 10px;">` : ''}
             </div>
@@ -327,7 +333,7 @@ async function submitEmergency() {
             category: 'emergency',
             title: 'EMERGENCY ISSUE - Immediate Attention Required',
             description: issue,
-            priority: 'emergency',
+            priority: 'emergency',  // ACO sets emergency priority
             status: 'pending',
             directToAdmin: true,
             isEmergency: true,
@@ -375,14 +381,18 @@ function showEmergencyForm() {
 function showNewComplaintForm() {
     const menuItems = document.querySelectorAll('.sidebar-menu li');
     menuItems.forEach((item, index) => {
-        if (index === 1) item.click();
+        if (item.getAttribute('data-tab') === 'new-complaint') {
+            item.click();
+        }
     });
 }
 
 function showDashboardTab() {
     const menuItems = document.querySelectorAll('.sidebar-menu li');
     menuItems.forEach((item, index) => {
-        if (index === 0) item.click();
+        if (item.getAttribute('data-tab') === 'dashboard') {
+            item.click();
+        }
     });
 }
 

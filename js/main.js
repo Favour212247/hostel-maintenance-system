@@ -50,22 +50,27 @@ function setupTabs() {
         'my-complaints': 'myComplaintsTab',
         'profile': 'profileTab',
         'complaints': 'dashboardTab',
-        'pending': 'dashboardTab',
-        'urgent': 'dashboardTab',
-        'resolved': 'dashboardTab',
         'students': 'studentsTab',
-        'technicians': 'techniciansTab',
-        'aco-config': 'acoConfigTab'
+        'technicians': 'techniciansTab'
     };
     
     menuItems.forEach(item => {
-        item.addEventListener('click', () => {
-            menuItems.forEach(i => i.classList.remove('active'));
-            item.classList.add('active');
+        // Remove any existing event listeners by cloning
+        const newItem = item.cloneNode(true);
+        item.parentNode.replaceChild(newItem, item);
+        
+        newItem.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             
-            const tabName = item.getAttribute('data-tab');
+            const tabName = this.getAttribute('data-tab');
             const tabId = tabMap[tabName];
             
+            // Update active states
+            document.querySelectorAll('.sidebar-menu li').forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Show the selected tab content
             if (tabId) {
                 document.querySelectorAll('.tab-content').forEach(tab => {
                     tab.classList.remove('active');
@@ -74,10 +79,10 @@ function setupTabs() {
                 if (activeTab) activeTab.classList.add('active');
             }
             
-            if (tabName === 'profile') loadProfile();
-            if (tabName === 'students') loadStudents();
-            if (tabName === 'technicians') loadTechnicians();
-            if (tabName === 'aco-config' && typeof loadAcoConfigToUI === 'function') loadAcoConfigToUI();
+            // Load specific data based on tab
+            if (tabName === 'profile' && typeof loadProfile === 'function') loadProfile();
+            if (tabName === 'students' && typeof loadStudents === 'function') loadStudents();
+            if (tabName === 'technicians' && typeof loadTechnicians === 'function') loadTechnicians();
         });
     });
 }
@@ -87,7 +92,9 @@ function setupMobileMenu() {
     const sidebar = document.getElementById('sidebar');
     
     if (toggleBtn && sidebar) {
-        toggleBtn.addEventListener('click', () => {
+        toggleBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             sidebar.classList.toggle('open');
         });
         
@@ -104,6 +111,7 @@ function setupMobileMenu() {
 function initComplaintForm() {
     const form = document.getElementById('complaintForm');
     if (form) {
+        form.removeEventListener('submit', submitComplaint);
         form.addEventListener('submit', submitComplaint);
     }
     
@@ -127,15 +135,15 @@ async function loadProfile() {
         container.innerHTML = `
             <div class="profile-field"><span class="profile-label">Name:</span><span class="profile-value">${escapeHtml(user.fullName)}</span></div>
             <div class="profile-field"><span class="profile-label">Role:</span><span class="profile-value">${user.role}</span></div>
-            <div class="profile-field"><span class="profile-label">Admin Type:</span><span class="profile-value">${user.adminType.toUpperCase()}</span></div>
+            <div class="profile-field"><span class="profile-label">Admin Type:</span><span class="profile-value">${user.adminType ? user.adminType.toUpperCase() : 'Admin'}</span></div>
         `;
     } else {
         container.innerHTML = `
             <div class="profile-field"><span class="profile-label">Full Name:</span><span class="profile-value">${escapeHtml(user.fullName)}</span></div>
-            <div class="profile-field"><span class="profile-label">Student ID:</span><span class="profile-value">${user.studentId}</span></div>
-            <div class="profile-field"><span class="profile-label">Email:</span><span class="profile-value">${user.email}</span></div>
-            <div class="profile-field"><span class="profile-label">Hostel Block:</span><span class="profile-value">${user.hostelBlock}</span></div>
-            <div class="profile-field"><span class="profile-label">Room Number:</span><span class="profile-value">${user.roomNumber}</span></div>
+            <div class="profile-field"><span class="profile-label">Student ID:</span><span class="profile-value">${user.studentId || 'N/A'}</span></div>
+            <div class="profile-field"><span class="profile-label">Email:</span><span class="profile-value">${user.email || 'N/A'}</span></div>
+            <div class="profile-field"><span class="profile-label">Hostel Block:</span><span class="profile-value">${user.hostelBlock || 'N/A'}</span></div>
+            <div class="profile-field"><span class="profile-label">Room Number:</span><span class="profile-value">${user.roomNumber || 'N/A'}</span></div>
             ${user.phone ? `<div class="profile-field"><span class="profile-label">Phone:</span><span class="profile-value">${user.phone}</span></div>` : ''}
         `;
     }
@@ -151,15 +159,19 @@ function initDashboard() {
     if (currentPage.includes('student-dashboard')) {
         const user = getCurrentUser();
         if (user && !user.isAdmin) {
-            document.getElementById('studentName').textContent = user.fullName || 'Student';
-            document.getElementById('studentRoomBadge').textContent = `Room: ${user.roomNumber || '--'}`;
-            loadStudentComplaints();
-            loadProfile();
+            const studentNameEl = document.getElementById('studentName');
+            const studentRoomBadge = document.getElementById('studentRoomBadge');
+            if (studentNameEl) studentNameEl.textContent = user.fullName || 'Student';
+            if (studentRoomBadge) studentRoomBadge.textContent = `Room: ${user.roomNumber || '--'}`;
             
+            if (typeof loadStudentComplaints === 'function') loadStudentComplaints();
+            if (typeof loadProfile === 'function') loadProfile();
+            
+            // Real-time updates
             db.collection('complaints')
                 .where('studentId', '==', user.uid)
                 .onSnapshot(() => {
-                    loadStudentComplaints();
+                    if (typeof loadStudentComplaints === 'function') loadStudentComplaints();
                 });
         }
     } else if (currentPage.includes('admin-dashboard')) {
@@ -167,6 +179,7 @@ function initDashboard() {
             loadAdminDashboard();
         }
         
+        // Real-time updates for admin
         db.collection('complaints').onSnapshot(() => {
             if (typeof loadAllComplaints === 'function') {
                 loadAllComplaints();
@@ -176,6 +189,12 @@ function initDashboard() {
         db.collection('students').onSnapshot(() => {
             if (typeof loadStudents === 'function') {
                 loadStudents();
+            }
+        });
+        
+        db.collection('technicians').onSnapshot(() => {
+            if (typeof loadTechnicians === 'function') {
+                loadTechnicians();
             }
         });
     }
@@ -224,7 +243,7 @@ window.escapeHtml = escapeHtml;
 window.formatDate = formatDate;
 window.getCurrentUser = getCurrentUser;
 
-// Debug function to check if complaints exist in Firestore
+// Debug function
 window.debugCheckComplaints = async function() {
     console.log('=== DEBUG: Checking Complaints ===');
     try {

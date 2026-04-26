@@ -61,7 +61,10 @@
 
             <div id="newComplaintTab" class="tab-content">
                 <div class="form-container">
-                    <div class="form-header"><h1><i class="fas fa-exclamation-circle"></i> Submit New Complaint</h1><p>Fill the form below. Urgent issues go straight to DSSS/VC.</p></div>
+                    <div class="form-header">
+                        <h1><i class="fas fa-exclamation-circle"></i> Submit New Complaint</h1>
+                        <p>Fill the form below. Our ACO system will automatically prioritize your complaint and route it to the appropriate department.</p>
+                    </div>
                     <form id="complaintForm">
                         <div class="form-section">
                             <h3>Issue Details</h3>
@@ -96,16 +99,9 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="form-section">
-                            <h3>Priority & Routing</h3>
-                            <div class="priority-options">
-                                <label class="priority-option"><input type="radio" name="priority" value="low"><span class="priority-label low"><i class="fas fa-walking"></i><h4>Low</h4><p>Minor issue</p></span></label>
-                                <label class="priority-option"><input type="radio" name="priority" value="medium" checked><span class="priority-label medium"><i class="fas fa-running"></i><h4>Medium</h4><p>Normal priority</p></span></label>
-                                <label class="priority-option"><input type="radio" name="priority" value="high"><span class="priority-label high"><i class="fas fa-bicycle"></i><h4>High</h4><p>Needs attention</p></span></label>
-                                <label class="priority-option"><input type="radio" name="priority" value="emergency"><span class="priority-label emergency"><i class="fas fa-ambulance"></i><h4>Emergency</h4><p>Goes to VC/DSSS</p></span></label>
-                            </div>
-                            <div class="alert alert-info" id="routingAlert"><i class="fas fa-info-circle"></i><p>This complaint will be sent to: <strong id="routeTo">Hostel Warden</strong></p></div>
-                            <div class="checkbox-group"><input type="checkbox" id="directToAdmin"><label for="directToAdmin"><i class="fas fa-shield-alt"></i> Send directly to DSSS/VC (Use for critical issues only)</label></div>
+                        <div class="alert alert-info" id="routingAlert">
+                            <i class="fas fa-robot"></i>
+                            <p><strong>ACO Smart Routing:</strong> Our system will automatically analyze your complaint and route it to the appropriate department based on urgency.</p>
                         </div>
                         <div class="form-actions">
                             <button type="button" class="btn btn-secondary" onclick="showDashboardTab()"><i class="fas fa-arrow-left"></i> Cancel</button>
@@ -131,7 +127,11 @@
 
     <div id="emergencyModal" class="modal"><div class="modal-content"><div class="modal-header"><h3><i class="fas fa-bolt"></i> Emergency Complaint</h3><button class="modal-close" onclick="closeModal('emergencyModal')">&times;</button></div><p class="modal-warning">⚠️ This will be sent directly to DSSS and VC office immediately!</p><textarea id="emergencyIssue" placeholder="Describe the emergency issue in detail..." rows="5"></textarea><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('emergencyModal')">Cancel</button><button class="btn btn-danger" onclick="submitEmergency()">Send to DSSS/VC</button></div></div></div>
 
-    <div id="successModal" class="modal"><div class="modal-content success-modal"><i class="fas fa-check-circle"></i><h3>Complaint Submitted Successfully!</h3><p>Your complaint has been sent to <strong id="sentToDisplay">Hostel Warden</strong></p><button class="btn btn-primary" onclick="closeModal('successModal'); showDashboardTab();">Go to Dashboard</button></div></div>
+    <div id="successModal" class="modal"><div class="modal-content success-modal"><i class="fas fa-check-circle"></i><h3>Complaint Submitted Successfully!</h3><p>Our ACO system has analyzed and routed your complaint to the appropriate department.</p><p>You will receive updates via notifications.</p><button class="btn btn-primary" onclick="closeModal('successModal'); showDashboardTab();">Go to Dashboard</button></div></div>
+
+    <div id="viewModal" class="modal"><div class="modal-content modal-large"><div class="modal-header"><h3>Complaint Details</h3><button class="modal-close" onclick="closeModal('viewModal')">&times;</button></div><div id="complaintDetails"></div></div></div>
+
+    <div id="toast" class="toast"></div>
 
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>

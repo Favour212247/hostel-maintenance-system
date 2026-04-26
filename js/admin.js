@@ -29,6 +29,7 @@ async function loadAdminDashboard() {
     await loadAllComplaints();
     await loadStudents();
     await loadTechnicians();
+    await loadTechniciansForSelect();
 }
 
 async function loadAllComplaints() {
@@ -106,6 +107,7 @@ function displayAdminComplaints(complaints) {
             <div class="complaint-header">
                 <span class="complaint-id">#${complaint.id.slice(-6)}</span>
                 <span class="complaint-priority priority-${complaint.priority}">${complaint.priority.toUpperCase()}</span>
+                <span class="complaint-status status-${complaint.status}">${getStatusText(complaint.status)}</span>
             </div>
             <div class="complaint-title">${escapeHtml(complaint.title)}</div>
             <div class="complaint-meta">
@@ -113,12 +115,13 @@ function displayAdminComplaints(complaints) {
                 <span><i class="fas fa-door-open"></i> ${complaint.studentRoom || 'N/A'}</span>
                 <span><i class="fas fa-tag"></i> ${complaint.category}</span>
                 <span><i class="fas fa-calendar"></i> ${formatDate(complaint.createdAt)}</span>
-                <span class="complaint-status status-${complaint.status}">${getStatusText(complaint.status)}</span>
+                ${complaint.assignedToName ? `<span><i class="fas fa-wrench"></i> ${escapeHtml(complaint.assignedToName)}</span>` : ''}
             </div>
             <div class="complaint-description-preview">${escapeHtml((complaint.description || '').substring(0, 100))}${(complaint.description || '').length > 100 ? '...' : ''}</div>
             <div class="complaint-actions">
                 <button class="btn btn-small" onclick="showUpdateModal('${complaint.id}')"><i class="fas fa-edit"></i> Update</button>
                 <button class="btn btn-small" onclick="viewComplaintDetails('${complaint.id}')"><i class="fas fa-eye"></i> View</button>
+                <button class="btn btn-small btn-primary" onclick="runACOForComplaint('${complaint.id}')"><i class="fas fa-robot"></i> ACO Assign</button>
             </div>
         </div>
     `).join('');
@@ -130,26 +133,150 @@ function filterAdminComplaints() {
 
 let currentComplaintToUpdate = null;
 
-function showUpdateModal(complaintId) {
+async function showUpdateModal(complaintId) {
     currentComplaintToUpdate = complaintId;
     const updateIdEl = document.getElementById('updateComplaintId');
     if (updateIdEl) updateIdEl.textContent = complaintId.slice(-6);
+    
+    // Load current complaint data
+    try {
+        const complaintDoc = await db.collection('complaints').doc(complaintId).get();
+        const complaint = complaintDoc.data();
+        
+        const prioritySelect = document.getElementById('prioritySelect');
+        if (prioritySelect && complaint.priority) {
+            prioritySelect.value = complaint.priority;
+        }
+        
+        const statusSelect = document.getElementById('newStatus');
+        if (statusSelect && complaint.status) {
+            statusSelect.value = complaint.status;
+        }
+        
+        const assignSelect = document.getElementById('assignTechnicianSelect');
+        if (assignSelect && complaint.assignedTo) {
+            assignSelect.value = complaint.assignedTo;
+        }
+        
+    } catch (error) {
+        console.error('Error loading complaint data:', error);
+    }
     
     const modal = document.getElementById('updateModal');
     if (modal) modal.style.display = 'flex';
 }
 
+async function loadTechniciansForSelect() {
+    try {
+        const snapshot = await db.collection('technicians').where('isActive', '==', true).get();
+        const select = document.getElementById('assignTechnicianSelect');
+        if (!select) return;
+        
+        select.innerHTML = '<option value="">Unassigned</option>';
+        snapshot.forEach(doc => {
+            const tech = doc.data();
+            select.innerHTML += `<option value="${doc.id}">${escapeHtml(tech.name)} (${tech.specialization})</option>`;
+        });
+    } catch (error) {
+        console.error('Error loading technicians for select:', error);
+    }
+}
+
+async function runACOForComplaint(complaintId) {
+    try {
+        showToast('Running ACO optimization for this complaint...', 'info');
+        
+        const complaintDoc = await db.collection('complaints').doc(complaintId).get();
+        const complaint = { id: complaintId, ...complaintDoc.data() };
+        
+        const techniciansSnapshot = await db.collection('technicians').where('isActive', '==', true).get();
+        const technicians = [];
+        techniciansSnapshot.forEach(doc => {
+            technicians.push({ id: doc.id, ...doc.data(), currentWorkload: 0 });
+        });
+        
+        if (technicians.length === 0) {
+            showToast('No technicians available for assignment', 'error');
+            return;
+        }
+        
+        const taskSnapshot = await db.collection('tasks')
+            .where('status', 'in', ['assigned', 'in-progress'])
+            .get();
+        
+        taskSnapshot.forEach(doc => {
+            const task = doc.data();
+            const tech = technicians.find(t => t.id === task.technicianId);
+            if (tech) tech.currentWorkload++;
+        });
+        
+        const aco = new AntColonyOptimizer([complaint], technicians, acoConfig);
+        const result = await aco.optimize();
+        
+        if (result && result.assignment && result.assignment[complaintId]) {
+            const assignedTechId = result.assignment[complaintId];
+            const assignedTech = technicians.find(t => t.id === assignedTechId);
+            
+            await db.collection('complaints').doc(complaintId).update({
+                assignedTo: assignedTechId,
+                assignedToName: assignedTech.name,
+                assignedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                status: 'assigned'
+            });
+            
+            await db.collection('tasks').add({
+                complaintId: complaintId,
+                technicianId: assignedTechId,
+                status: 'assigned',
+                assignedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            await db.collection('notifications').add({
+                userId: complaint.studentId,
+                title: 'Complaint Assigned via ACO',
+                message: `Your complaint "${complaint.title}" has been assigned to ${assignedTech.name} (${assignedTech.specialization})`,
+                read: false,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            showToast(`✅ Complaint assigned to ${assignedTech.name} via ACO`, 'success');
+            loadAllComplaints();
+        } else {
+            showToast('ACO could not find a suitable technician', 'info');
+        }
+        
+    } catch (error) {
+        console.error('ACO assignment error:', error);
+        showToast('Error running ACO: ' + error.message, 'error');
+    }
+}
+
 async function updateComplaintStatus() {
     const newStatus = document.getElementById('newStatus').value;
+    const newPriority = document.getElementById('prioritySelect').value;
+    const assignedTo = document.getElementById('assignTechnicianSelect').value;
     const remarks = document.getElementById('adminRemarks').value;
     
     try {
-        await db.collection('complaints').doc(currentComplaintToUpdate).update({
+        const updateData = {
             status: newStatus,
+            priority: newPriority,
             adminRemarks: remarks,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             resolvedAt: newStatus === 'resolved' ? firebase.firestore.FieldValue.serverTimestamp() : null
-        });
+        };
+        
+        if (assignedTo) {
+            const techDoc = await db.collection('technicians').doc(assignedTo).get();
+            if (techDoc.exists) {
+                updateData.assignedTo = assignedTo;
+                updateData.assignedToName = techDoc.data().name;
+                updateData.assignedAt = firebase.firestore.FieldValue.serverTimestamp();
+            }
+        }
+        
+        await db.collection('complaints').doc(currentComplaintToUpdate).update(updateData);
         
         const complaintDoc = await db.collection('complaints').doc(currentComplaintToUpdate).get();
         const complaint = complaintDoc.data();
@@ -158,13 +285,13 @@ async function updateComplaintStatus() {
             await db.collection('notifications').add({
                 userId: complaint.studentId,
                 title: `Complaint ${newStatus === 'resolved' ? 'Resolved' : 'Updated'}`,
-                message: `Your complaint "${complaint.title}" status has been updated to ${newStatus}. ${remarks ? 'Remarks: ' + remarks : ''}`,
+                message: `Your complaint "${complaint.title}" status has been updated to ${newStatus}. Priority: ${newPriority.toUpperCase()}. ${remarks ? 'Remarks: ' + remarks : ''}`,
                 read: false,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
         }
         
-        showToast('Complaint status updated successfully', 'success');
+        showToast('Complaint updated successfully', 'success');
         closeModal('updateModal');
         
         const remarksInput = document.getElementById('adminRemarks');
@@ -291,6 +418,7 @@ async function addTechnician() {
         if (techPhoneInput) techPhoneInput.value = '';
         
         await loadTechnicians();
+        await loadTechniciansForSelect();
         
     } catch (error) {
         console.error('Error adding technician:', error);
@@ -304,6 +432,7 @@ async function deleteTechnician(techId) {
             await db.collection('technicians').doc(techId).delete();
             showToast('Technician removed', 'success');
             await loadTechnicians();
+            await loadTechniciansForSelect();
         } catch (error) {
             console.error('Error deleting technician:', error);
             showToast('Error deleting technician: ' + error.message, 'error');

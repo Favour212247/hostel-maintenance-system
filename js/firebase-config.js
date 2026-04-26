@@ -113,10 +113,12 @@ auth.onAuthStateChanged(async (user) => {
             return;
         }
         
-        // For student dashboard, check email verification
+        // For student dashboard, check email verification (optional - comment out for testing)
         if (currentPage.includes('student-dashboard.html')) {
             await user.reload();
             
+            // Comment out for testing - uncomment for production
+            /*
             if (!user.emailVerified) {
                 await auth.signOut();
                 sessionStorage.removeItem('currentUser');
@@ -126,6 +128,7 @@ auth.onAuthStateChanged(async (user) => {
                 }, 2000);
                 return;
             }
+            */
             
             // Update user record in Firestore
             const userRef = db.collection('students').doc(user.uid);

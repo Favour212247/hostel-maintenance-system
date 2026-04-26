@@ -2,21 +2,29 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     if (window.location.pathname.includes('admin-dashboard.html')) {
-        loadAdminDashboard();
-        setupTabs();
-        setupMobileMenu();
+        setTimeout(() => {
+            loadAdminDashboard();
+            setupTabs();
+            setupMobileMenu();
+        }, 100);
     }
 });
 
 async function loadAdminDashboard() {
     const user = getCurrentUser();
     if (!user || !user.isAdmin) {
+        console.log('No admin user found, redirecting to login');
         window.location.href = 'index.html';
         return;
     }
     
-    document.getElementById('adminName').textContent = user.fullName;
-    document.getElementById('adminRole').textContent = user.role;
+    const adminNameEl = document.getElementById('adminName');
+    const adminRoleEl = document.getElementById('adminRole');
+    
+    if (adminNameEl) adminNameEl.textContent = user.fullName;
+    if (adminRoleEl) adminRoleEl.textContent = user.role;
+    
+    console.log('Admin dashboard loaded for:', user.fullName);
     
     await loadAllComplaints();
     await loadStudents();
@@ -25,36 +33,56 @@ async function loadAdminDashboard() {
 
 async function loadAllComplaints() {
     try {
-        const snapshot = await db.collection('complaints').orderBy('createdAt', 'desc').get();
+        console.log('Loading all complaints for admin...');
+        
+        const snapshot = await db.collection('complaints')
+            .orderBy('createdAt', 'desc')
+            .get();
+        
         const complaints = [];
         snapshot.forEach(doc => {
-            complaints.push({ id: doc.id, ...doc.data() });
+            const data = doc.data();
+            complaints.push({ 
+                id: doc.id, 
+                ...data,
+                createdAt: data.createdAt || firebase.firestore.Timestamp.now()
+            });
         });
+        
+        console.log(`Found ${complaints.length} total complaints`);
         
         updateAdminStats(complaints);
         displayAdminComplaints(complaints);
         
     } catch (error) {
         console.error('Error loading complaints:', error);
-        showToast('Error loading complaints', 'error');
+        showToast('Error loading complaints: ' + error.message, 'error');
     }
 }
 
 function updateAdminStats(complaints) {
     const total = complaints.length;
-    const pending = complaints.filter(c => c.status === 'pending').length;
+    const pending = complaints.filter(c => c.status === 'pending' || c.status === 'unassigned').length;
     const inProgress = complaints.filter(c => c.status === 'in-progress' || c.status === 'assigned').length;
     const resolved = complaints.filter(c => c.status === 'resolved').length;
     
-    document.getElementById('totalComplaints').textContent = total;
-    document.getElementById('pendingCount').textContent = pending;
-    document.getElementById('inProgressCount').textContent = inProgress;
-    document.getElementById('resolvedCount').textContent = resolved;
+    const totalEl = document.getElementById('totalComplaints');
+    const pendingEl = document.getElementById('pendingCount');
+    const inProgressEl = document.getElementById('inProgressCount');
+    const resolvedEl = document.getElementById('resolvedCount');
+    
+    if (totalEl) totalEl.textContent = total;
+    if (pendingEl) pendingEl.textContent = pending;
+    if (inProgressEl) inProgressEl.textContent = inProgress;
+    if (resolvedEl) resolvedEl.textContent = resolved;
 }
 
 function displayAdminComplaints(complaints) {
     const container = document.getElementById('adminComplaintsList');
-    if (!container) return;
+    if (!container) {
+        console.log('Container adminComplaintsList not found');
+        return;
+    }
     
     const statusFilter = document.getElementById('statusFilter')?.value || 'all';
     const priorityFilter = document.getElementById('priorityFilter')?.value || 'all';
@@ -82,12 +110,12 @@ function displayAdminComplaints(complaints) {
             <div class="complaint-title">${escapeHtml(complaint.title)}</div>
             <div class="complaint-meta">
                 <span><i class="fas fa-user"></i> ${escapeHtml(complaint.studentName)}</span>
-                <span><i class="fas fa-door-open"></i> ${complaint.studentRoom}</span>
+                <span><i class="fas fa-door-open"></i> ${complaint.studentRoom || 'N/A'}</span>
                 <span><i class="fas fa-tag"></i> ${complaint.category}</span>
                 <span><i class="fas fa-calendar"></i> ${formatDate(complaint.createdAt)}</span>
                 <span class="complaint-status status-${complaint.status}">${getStatusText(complaint.status)}</span>
             </div>
-            <div class="complaint-description-preview">${escapeHtml(complaint.description.substring(0, 100))}${complaint.description.length > 100 ? '...' : ''}</div>
+            <div class="complaint-description-preview">${escapeHtml((complaint.description || '').substring(0, 100))}${(complaint.description || '').length > 100 ? '...' : ''}</div>
             <div class="complaint-actions">
                 <button class="btn btn-small" onclick="showUpdateModal('${complaint.id}')"><i class="fas fa-edit"></i> Update</button>
                 <button class="btn btn-small" onclick="viewComplaintDetails('${complaint.id}')"><i class="fas fa-eye"></i> View</button>
@@ -104,8 +132,11 @@ let currentComplaintToUpdate = null;
 
 function showUpdateModal(complaintId) {
     currentComplaintToUpdate = complaintId;
-    document.getElementById('updateComplaintId').textContent = complaintId.slice(-6);
-    document.getElementById('updateModal').style.display = 'flex';
+    const updateIdEl = document.getElementById('updateComplaintId');
+    if (updateIdEl) updateIdEl.textContent = complaintId.slice(-6);
+    
+    const modal = document.getElementById('updateModal');
+    if (modal) modal.style.display = 'flex';
 }
 
 async function updateComplaintStatus() {
@@ -120,7 +151,6 @@ async function updateComplaintStatus() {
             resolvedAt: newStatus === 'resolved' ? firebase.firestore.FieldValue.serverTimestamp() : null
         });
         
-        // Get complaint details for notification
         const complaintDoc = await db.collection('complaints').doc(currentComplaintToUpdate).get();
         const complaint = complaintDoc.data();
         
@@ -136,12 +166,19 @@ async function updateComplaintStatus() {
         
         showToast('Complaint status updated successfully', 'success');
         closeModal('updateModal');
-        document.getElementById('adminRemarks').value = '';
-        loadAllComplaints();
+        
+        const remarksInput = document.getElementById('adminRemarks');
+        if (remarksInput) remarksInput.value = '';
+        
+        await loadAllComplaints();
+        
+        if (typeof loadStudentComplaints === 'function') {
+            loadStudentComplaints();
+        }
         
     } catch (error) {
         console.error('Error updating complaint:', error);
-        showToast('Error updating complaint', 'error');
+        showToast('Error updating complaint: ' + error.message, 'error');
     }
 }
 
@@ -153,7 +190,8 @@ async function loadStudents() {
             students.push({ id: doc.id, ...doc.data() });
         });
         
-        document.getElementById('totalStudents').textContent = students.length;
+        const totalStudentsEl = document.getElementById('totalStudents');
+        if (totalStudentsEl) totalStudentsEl.textContent = students.length;
         
         const container = document.getElementById('studentsList');
         if (!container) return;
@@ -167,8 +205,8 @@ async function loadStudents() {
             <div class="student-card">
                 <div>
                     <strong>${escapeHtml(student.fullName)}</strong><br>
-                    <small>${student.studentId} | ${student.hostelBlock} - ${student.roomNumber}</small><br>
-                    <small>${student.email}</small>
+                    <small>${student.studentId || 'N/A'} | ${student.hostelBlock || 'N/A'} - ${student.roomNumber || 'N/A'}</small><br>
+                    <small>${student.email || 'N/A'}</small>
                 </div>
                 <div>
                     <span class="badge">Registered: ${formatDate(student.createdAt)}</span>
@@ -202,7 +240,7 @@ async function loadTechnicians() {
             <div class="technician-card">
                 <div>
                     <strong>${escapeHtml(tech.name)}</strong><br>
-                    <small>${tech.specialization} | Zone ${tech.zone}</small><br>
+                    <small>${tech.specialization || 'General'} | Zone ${tech.zone || 'A'}</small><br>
                     <small>📞 ${tech.phone || 'No phone'}</small>
                 </div>
                 <div>
@@ -213,11 +251,13 @@ async function loadTechnicians() {
         
     } catch (error) {
         console.error('Error loading technicians:', error);
+        showToast('Error loading technicians', 'error');
     }
 }
 
 function showAddTechnicianModal() {
-    document.getElementById('addTechnicianModal').style.display = 'flex';
+    const modal = document.getElementById('addTechnicianModal');
+    if (modal) modal.style.display = 'flex';
 }
 
 async function addTechnician() {
@@ -235,7 +275,7 @@ async function addTechnician() {
         await db.collection('technicians').add({
             name: name,
             specialization: specialization,
-            phone: phone,
+            phone: phone || '',
             zone: zone,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             isActive: true
@@ -244,14 +284,17 @@ async function addTechnician() {
         showToast('Technician added successfully', 'success');
         closeModal('addTechnicianModal');
         
-        document.getElementById('techName').value = '';
-        document.getElementById('techPhone').value = '';
+        const techNameInput = document.getElementById('techName');
+        const techPhoneInput = document.getElementById('techPhone');
         
-        loadTechnicians();
+        if (techNameInput) techNameInput.value = '';
+        if (techPhoneInput) techPhoneInput.value = '';
+        
+        await loadTechnicians();
         
     } catch (error) {
         console.error('Error adding technician:', error);
-        showToast('Error adding technician', 'error');
+        showToast('Error adding technician: ' + error.message, 'error');
     }
 }
 
@@ -260,10 +303,15 @@ async function deleteTechnician(techId) {
         try {
             await db.collection('technicians').doc(techId).delete();
             showToast('Technician removed', 'success');
-            loadTechnicians();
+            await loadTechnicians();
         } catch (error) {
             console.error('Error deleting technician:', error);
-            showToast('Error deleting technician', 'error');
+            showToast('Error deleting technician: ' + error.message, 'error');
         }
     }
 }
+
+window.refreshAdminComplaints = function() {
+    console.log('Manually refreshing admin complaints...');
+    loadAllComplaints();
+};

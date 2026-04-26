@@ -597,12 +597,19 @@ function saveAcoConfig() {
 }
 
 function loadAcoConfigToUI() {
-    document.getElementById('acoAnts').value = acoConfig.numAnts;
-    document.getElementById('acoAlpha').value = acoConfig.alpha;
-    document.getElementById('acoBeta').value = acoConfig.beta;
-    document.getElementById('acoRho').value = acoConfig.rho;
-    document.getElementById('acoQ').value = acoConfig.q;
-    document.getElementById('acoIterations').value = acoConfig.iterations;
+    const antsEl = document.getElementById('acoAnts');
+    const alphaEl = document.getElementById('acoAlpha');
+    const betaEl = document.getElementById('acoBeta');
+    const rhoEl = document.getElementById('acoRho');
+    const qEl = document.getElementById('acoQ');
+    const iterationsEl = document.getElementById('acoIterations');
+    
+    if (antsEl) antsEl.value = acoConfig.numAnts;
+    if (alphaEl) alphaEl.value = acoConfig.alpha;
+    if (betaEl) betaEl.value = acoConfig.beta;
+    if (rhoEl) rhoEl.value = acoConfig.rho;
+    if (qEl) qEl.value = acoConfig.q;
+    if (iterationsEl) iterationsEl.value = acoConfig.iterations;
 }
 
 async function runManualAllocation() {
@@ -658,3 +665,8 @@ window.detectAutoPriority = detectAutoPriority;
 window.determineAutoRouting = determineAutoRouting;
 window.getPriorityDisplay = getPriorityDisplay;
 window.getRoutingDisplay = getRoutingDisplay;
+window.allocateComplaint = allocateComplaint;
+window.runBatchAllocation = runBatchAllocation;
+window.saveAcoConfig = saveAcoConfig;
+window.loadAcoConfigToUI = loadAcoConfigToUI;
+window.runManualAllocation = runManualAllocation;

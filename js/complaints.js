@@ -5,17 +5,26 @@ let currentStudentUser = null;
 document.addEventListener('DOMContentLoaded', () => {
     const complaintForm = document.getElementById('complaintForm');
     if (complaintForm) {
+        complaintForm.removeEventListener('submit', submitComplaint);
         complaintForm.addEventListener('submit', submitComplaint);
     }
     
     if (window.location.pathname.includes('student-dashboard.html')) {
-        loadStudentComplaints();
+        setTimeout(() => {
+            loadStudentComplaints();
+        }, 500);
     }
 });
 
 async function loadStudentComplaints() {
     currentStudentUser = getCurrentUser();
-    if (!currentStudentUser || currentStudentUser.isAdmin) return;
+    
+    if (!currentStudentUser || currentStudentUser.isAdmin) {
+        console.log('No student user found or user is admin');
+        return;
+    }
+    
+    console.log('Loading complaints for student:', currentStudentUser.uid);
     
     try {
         const complaintsSnapshot = await db.collection('complaints')
@@ -25,8 +34,15 @@ async function loadStudentComplaints() {
         
         const complaints = [];
         complaintsSnapshot.forEach(doc => {
-            complaints.push({ id: doc.id, ...doc.data() });
+            const data = doc.data();
+            complaints.push({ 
+                id: doc.id, 
+                ...data,
+                createdAt: data.createdAt || firebase.firestore.Timestamp.now()
+            });
         });
+        
+        console.log(`Found ${complaints.length} complaints for student`);
         
         updateStudentStats(complaints);
         displayRecentComplaints(complaints.slice(0, 5));
@@ -34,12 +50,12 @@ async function loadStudentComplaints() {
         
     } catch (error) {
         console.error('Error loading complaints:', error);
-        showToast('Error loading complaints', 'error');
+        showToast('Error loading complaints: ' + error.message, 'error');
     }
 }
 
 function updateStudentStats(complaints) {
-    const pending = complaints.filter(c => c.status === 'pending').length;
+    const pending = complaints.filter(c => c.status === 'pending' || c.status === 'unassigned').length;
     const inProgress = complaints.filter(c => c.status === 'in-progress' || c.status === 'assigned').length;
     const resolved = complaints.filter(c => c.status === 'resolved').length;
     
@@ -119,10 +135,6 @@ function filterComplaints() {
     loadStudentComplaints();
 }
 
-// ========================================
-// SUBMIT COMPLAINT WITH AUTO-DETECTION
-// ========================================
-
 async function submitComplaint(event) {
     if (event) event.preventDefault();
     
@@ -135,7 +147,6 @@ async function submitComplaint(event) {
         return;
     }
     
-    // AUTO-DETECT PRIORITY AND ROUTING
     const autoPriority = detectAutoPriority(title, description, category);
     const autoRouting = determineAutoRouting(autoPriority, category, description);
     
@@ -147,7 +158,6 @@ async function submitComplaint(event) {
         return;
     }
     
-    // Show detection results to user
     const confirmMessage = `🔍 SYSTEM ANALYSIS RESULTS:\n\n` +
         `📋 Issue: ${title}\n` +
         `🏷️ Category: ${category}\n\n` +
@@ -170,6 +180,7 @@ async function submitComplaint(event) {
         const complaintData = {
             studentId: user.uid,
             studentName: user.fullName,
+            studentEmail: user.email,
             studentRoom: user.roomNumber,
             hostelBlock: user.hostelBlock,
             category: category,
@@ -182,10 +193,15 @@ async function submitComplaint(event) {
             detectionScore: autoPriority,
             routingTo: autoRouting,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             imageDataUrl: imageDataUrl
         };
         
+        console.log('Submitting complaint:', complaintData);
+        
         const docRef = await db.collection('complaints').add(complaintData);
+        
+        console.log('Complaint saved with ID:', docRef.id);
         
         const notificationTitle = autoRouting === 'dsss_vc' ? 
             '🚨 EMERGENCY COMPLAINT - IMMEDIATE ACTION 🚨' : 
@@ -201,24 +217,35 @@ async function submitComplaint(event) {
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        const newComplaint = { id: docRef.id, ...complaintData, zone: user.hostelBlock.charAt(0) };
-        
-        if (autoPriority !== 'emergency') {
+        if (autoPriority !== 'emergency' && typeof allocateComplaint === 'function') {
+            const newComplaint = { id: docRef.id, ...complaintData, zone: user.hostelBlock ? user.hostelBlock.charAt(0) : 'A' };
             await allocateComplaint(newComplaint);
         }
         
         const sentTo = getRoutingDisplay(autoRouting);
-        document.getElementById('sentToDisplay').textContent = sentTo;
-        document.getElementById('successModal').style.display = 'flex';
+        const sentToDisplay = document.getElementById('sentToDisplay');
+        if (sentToDisplay) sentToDisplay.textContent = sentTo;
         
-        document.getElementById('complaintForm').reset();
-        document.getElementById('fileName').textContent = 'No file chosen';
+        const successModal = document.getElementById('successModal');
+        if (successModal) successModal.style.display = 'flex';
+        
+        const complaintForm = document.getElementById('complaintForm');
+        if (complaintForm) complaintForm.reset();
+        
+        const fileNameSpan = document.getElementById('fileName');
+        if (fileNameSpan) fileNameSpan.textContent = 'No file chosen';
         
         showToast(`✅ Complaint submitted! Priority: ${autoPriority.toUpperCase()}`, 'success');
         
         setTimeout(() => {
             loadStudentComplaints();
-        }, 1000);
+        }, 1500);
+        
+        if (typeof loadAllComplaints === 'function') {
+            setTimeout(() => {
+                loadAllComplaints();
+            }, 2000);
+        }
         
     } catch (error) {
         console.error('Error submitting complaint:', error);
@@ -257,7 +284,7 @@ async function viewComplaintDetails(complaintId) {
                 <p><strong>Status:</strong> <span class="complaint-status status-${complaint.status}">${getStatusText(complaint.status)}</span></p>
                 <p><strong>Description:</strong> ${escapeHtml(complaint.description)}</p>
                 <p><strong>Submitted:</strong> ${formatDate(complaint.createdAt)}</p>
-                ${complaint.assignedToName ? `<p><strong>Assigned To:</strong> ${complaint.assignedToName}</p>` : ''}
+                ${complaint.assignedToName ? `<p><strong>Assigned To:</strong> ${escapeHtml(complaint.assignedToName)}</p>` : ''}
                 ${complaint.adminRemarks ? `<p><strong>Admin Remarks:</strong> ${escapeHtml(complaint.adminRemarks)}</p>` : ''}
                 ${complaint.imageDataUrl ? `<p><strong>Attached Image:</strong></p><img src="${complaint.imageDataUrl}" style="max-width: 100%; border-radius: 8px; margin-top: 10px;">` : ''}
             </div>
@@ -294,6 +321,7 @@ async function submitEmergency() {
         const complaintData = {
             studentId: user.uid,
             studentName: user.fullName,
+            studentEmail: user.email,
             studentRoom: user.roomNumber,
             hostelBlock: user.hostelBlock,
             category: 'emergency',
@@ -305,7 +333,8 @@ async function submitEmergency() {
             isEmergency: true,
             autoDetected: true,
             routingTo: 'dsss_vc',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
         const docRef = await db.collection('complaints').add(complaintData);
@@ -325,11 +354,14 @@ async function submitEmergency() {
         setTimeout(() => {
             showDashboardTab();
             loadStudentComplaints();
+            if (typeof loadAllComplaints === 'function') {
+                loadAllComplaints();
+            }
         }, 1500);
         
     } catch (error) {
         console.error('Error submitting emergency:', error);
-        showToast('Error submitting emergency complaint', 'error');
+        showToast('Error submitting emergency complaint: ' + error.message, 'error');
     } finally {
         showLoading(false);
     }
@@ -359,7 +391,16 @@ function getStatusText(status) {
         'pending': 'Pending',
         'assigned': 'Assigned',
         'in-progress': 'In Progress',
-        'resolved': 'Resolved'
+        'resolved': 'Resolved',
+        'unassigned': 'Unassigned'
     };
     return statusMap[status] || status;
 }
+
+window.refreshComplaints = function() {
+    console.log('Manually refreshing complaints...');
+    loadStudentComplaints();
+    if (typeof loadAllComplaints === 'function') {
+        loadAllComplaints();
+    }
+};

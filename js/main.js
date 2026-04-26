@@ -223,3 +223,32 @@ window.runManualAllocation = runManualAllocation;
 window.escapeHtml = escapeHtml;
 window.formatDate = formatDate;
 window.getCurrentUser = getCurrentUser;
+
+// Debug function to check if complaints exist in Firestore
+window.debugCheckComplaints = async function() {
+    console.log('=== DEBUG: Checking Complaints ===');
+    try {
+        const snapshot = await db.collection('complaints').get();
+        console.log(`Total complaints in Firestore: ${snapshot.size}`);
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            console.log(`- ${doc.id}: ${data.title} (${data.status}) - Student: ${data.studentName}`);
+        });
+        
+        const user = getCurrentUser();
+        if (user && !user.isAdmin) {
+            const userSnapshot = await db.collection('complaints')
+                .where('studentId', '==', user.uid)
+                .get();
+            console.log(`Complaints for current student (${user.uid}): ${userSnapshot.size}`);
+        }
+        
+        return snapshot.size;
+    } catch (error) {
+        console.error('Debug error:', error);
+        return 0;
+    }
+};
+
+console.log('Debug function available: type debugCheckComplaints() in console');

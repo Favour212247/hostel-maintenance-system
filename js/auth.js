@@ -42,9 +42,14 @@ function showAdminPasswordModal(adminType) {
         'vc': 'VC Office',
         'warden': 'Hostel Warden'
     };
-    document.getElementById('adminTypeDisplay').textContent = adminNames[adminType];
-    document.getElementById('adminPassword').value = '';
-    document.getElementById('adminPasswordModal').style.display = 'flex';
+    const adminTypeDisplay = document.getElementById('adminTypeDisplay');
+    if (adminTypeDisplay) adminTypeDisplay.textContent = adminNames[adminType];
+    
+    const passwordInput = document.getElementById('adminPassword');
+    if (passwordInput) passwordInput.value = '';
+    
+    const modal = document.getElementById('adminPasswordModal');
+    if (modal) modal.style.display = 'flex';
 }
 
 async function verifyAdminLogin() {
@@ -79,8 +84,11 @@ async function verifyAdminLogin() {
         }, 500);
     } else {
         showToast('Invalid password. Access denied.', 'error');
-        document.getElementById('adminPassword').value = '';
-        document.getElementById('adminPassword').focus();
+        const passwordInput = document.getElementById('adminPassword');
+        if (passwordInput) {
+            passwordInput.value = '';
+            passwordInput.focus();
+        }
     }
 }
 
@@ -137,7 +145,8 @@ async function registerStudent() {
         
         showToast('Registration successful! A verification link has been sent to your email. Please check your inbox and spam folder.', 'success');
         
-        document.getElementById('studentRegisterForm').reset();
+        const registerForm = document.getElementById('studentRegisterForm');
+        if (registerForm) registerForm.reset();
         
         setTimeout(() => {
             switchTab('login');
@@ -197,7 +206,7 @@ async function loginStudent(email = null, password = null) {
         
         await user.reload();
         
-        // Comment out email verification for testing - UNCOMMENT FOR PRODUCTION
+        // Commented out for testing - uncomment for production
         /*
         if (!user.emailVerified) {
             await auth.signOut();
@@ -272,15 +281,15 @@ function switchTab(tab) {
     const tabs = document.querySelectorAll('.tab-btn');
     
     if (tab === 'login') {
-        loginForm.classList.add('active');
-        registerForm.classList.remove('active');
-        tabs[0].classList.add('active');
-        tabs[1].classList.remove('active');
+        if (loginForm) loginForm.classList.add('active');
+        if (registerForm) registerForm.classList.remove('active');
+        if (tabs[0]) tabs[0].classList.add('active');
+        if (tabs[1]) tabs[1].classList.remove('active');
     } else {
-        loginForm.classList.remove('active');
-        registerForm.classList.add('active');
-        tabs[0].classList.remove('active');
-        tabs[1].classList.add('active');
+        if (loginForm) loginForm.classList.remove('active');
+        if (registerForm) registerForm.classList.add('active');
+        if (tabs[0]) tabs[0].classList.remove('active');
+        if (tabs[1]) tabs[1].classList.add('active');
     }
 }
 

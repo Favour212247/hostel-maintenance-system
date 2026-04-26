@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Student Dashboard - Hostel Complaint System</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <button class="mobile-menu-toggle" id="mobileMenuToggle">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <nav class="navbar">
+        <div class="nav-left">
+            <div class="logo">
+                <i class="fas fa-university"></i>
+                <span>Hostel Complaints</span>
+            </div>
+        </div>
+        <div class="nav-right">
+            <div class="user-info">
+                <i class="fas fa-user-circle"></i>
+                <span id="studentName">Student Name</span>
+                <span class="badge" id="studentRoomBadge">Room: --</span>
+            </div>
+            <button class="btn btn-small btn-logout" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </div>
+    </nav>
+
+    <div class="dashboard-container">
+        <aside class="sidebar" id="sidebar">
+            <ul class="sidebar-menu">
+                <li class="active" data-tab="dashboard"><a href="#"><i class="fas fa-home"></i> Dashboard</a></li>
+                <li data-tab="new-complaint"><a href="#"><i class="fas fa-plus-circle"></i> New Complaint</a></li>
+                <li data-tab="my-complaints"><a href="#"><i class="fas fa-list"></i> My Complaints</a></li>
+                <li data-tab="profile"><a href="#"><i class="fas fa-user"></i> Profile</a></li>
+            </ul>
+        </aside>
+
+        <main class="main-content">
+            <div id="dashboardTab" class="tab-content active">
+                <div class="stats-cards">
+                    <div class="stat-card pending"><h3 id="pendingCount">0</h3><p>Pending</p><i class="fas fa-clock"></i></div>
+                    <div class="stat-card in-progress"><h3 id="inProgressCount">0</h3><p>In Progress</p><i class="fas fa-tools"></i></div>
+                    <div class="stat-card resolved"><h3 id="resolvedCount">0</h3><p>Resolved</p><i class="fas fa-check-circle"></i></div>
+                </div>
+                <div class="quick-actions">
+                    <button class="btn btn-primary btn-large" onclick="showNewComplaintForm()"><i class="fas fa-plus"></i> Submit New Complaint</button>
+                    <button class="btn btn-danger btn-large" onclick="showEmergencyForm()"><i class="fas fa-bolt"></i> Emergency Issue</button>
+                </div>
+                <section class="complaints-section">
+                    <h2><i class="fas fa-history"></i> Recent Complaints</h2>
+                    <div class="complaints-list" id="recentComplaintsList"><div class="loading">Loading your complaints...</div></div>
+                </section>
+            </div>
+
+            <div id="newComplaintTab" class="tab-content">
+                <div class="form-container">
+                    <div class="form-header"><h1><i class="fas fa-exclamation-circle"></i> Submit New Complaint</h1><p>Fill the form below. Urgent issues go straight to DSSS/VC.</p></div>
+                    <form id="complaintForm">
+                        <div class="form-section">
+                            <h3>Issue Details</h3>
+                            <div class="form-group">
+                                <label for="complaintCategory"><i class="fas fa-tag"></i> Category *</label>
+                                <select id="complaintCategory" required>
+                                    <option value="">Select Category</option>
+                                    <option value="electricity">⚡ Electricity</option>
+                                    <option value="plumbing">🚰 Plumbing/Water</option>
+                                    <option value="sanitation">🧹 Sanitation</option>
+                                    <option value="wifi">📡 WiFi/Internet</option>
+                                    <option value="furniture">🛏️ Furniture</option>
+                                    <option value="security">🚨 Security</option>
+                                    <option value="noise">🔊 Noise Complaint</option>
+                                    <option value="other">📝 Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="complaintTitle"><i class="fas fa-heading"></i> Brief Title *</label>
+                                <input type="text" id="complaintTitle" placeholder="e.g., Broken Window in Room B-204" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="complaintDescription"><i class="fas fa-file-alt"></i> Detailed Description *</label>
+                                <textarea id="complaintDescription" rows="5" placeholder="Describe the issue in detail..." required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-image"></i> Attach Image (Optional)</label>
+                                <div class="file-upload">
+                                    <input type="file" id="complaintImage" accept="image/*">
+                                    <label for="complaintImage" class="btn btn-outline"><i class="fas fa-upload"></i> Choose File</label>
+                                    <span id="fileName">No file chosen</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-section">
+                            <h3>Priority & Routing</h3>
+                            <div class="priority-options">
+                                <label class="priority-option"><input type="radio" name="priority" value="low"><span class="priority-label low"><i class="fas fa-walking"></i><h4>Low</h4><p>Minor issue</p></span></label>
+                                <label class="priority-option"><input type="radio" name="priority" value="medium" checked><span class="priority-label medium"><i class="fas fa-running"></i><h4>Medium</h4><p>Normal priority</p></span></label>
+                                <label class="priority-option"><input type="radio" name="priority" value="high"><span class="priority-label high"><i class="fas fa-bicycle"></i><h4>High</h4><p>Needs attention</p></span></label>
+                                <label class="priority-option"><input type="radio" name="priority" value="emergency"><span class="priority-label emergency"><i class="fas fa-ambulance"></i><h4>Emergency</h4><p>Goes to VC/DSSS</p></span></label>
+                            </div>
+                            <div class="alert alert-info" id="routingAlert"><i class="fas fa-info-circle"></i><p>This complaint will be sent to: <strong id="routeTo">Hostel Warden</strong></p></div>
+                            <div class="checkbox-group"><input type="checkbox" id="directToAdmin"><label for="directToAdmin"><i class="fas fa-shield-alt"></i> Send directly to DSSS/VC (Use for critical issues only)</label></div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-secondary" onclick="showDashboardTab()"><i class="fas fa-arrow-left"></i> Cancel</button>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Submit Complaint</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div id="myComplaintsTab" class="tab-content">
+                <div class="complaints-section">
+                    <h2><i class="fas fa-list"></i> All My Complaints</h2>
+                    <div class="filter-options"><select id="complaintFilter" onchange="filterComplaints()"><option value="all">All Status</option><option value="pending">Pending</option><option value="in-progress">In Progress</option><option value="resolved">Resolved</option></select></div>
+                    <div class="complaints-list" id="allComplaintsList"><div class="loading">Loading complaints...</div></div>
+                </div>
+            </div>
+
+            <div id="profileTab" class="tab-content">
+                <div class="profile-container"><div class="profile-header"><i class="fas fa-user-circle"></i><h2>Student Profile</h2></div><div class="profile-info" id="profileInfo"><div class="loading">Loading profile...</div></div></div>
+            </div>
+        </main>
+    </div>
+
+    <div id="emergencyModal" class="modal"><div class="modal-content"><div class="modal-header"><h3><i class="fas fa-bolt"></i> Emergency Complaint</h3><button class="modal-close" onclick="closeModal('emergencyModal')">&times;</button></div><p class="modal-warning">⚠️ This will be sent directly to DSSS and VC office immediately!</p><textarea id="emergencyIssue" placeholder="Describe the emergency issue in detail..." rows="5"></textarea><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('emergencyModal')">Cancel</button><button class="btn btn-danger" onclick="submitEmergency()">Send to DSSS/VC</button></div></div></div>
+
+    <div id="successModal" class="modal"><div class="modal-content success-modal"><i class="fas fa-check-circle"></i><h3>Complaint Submitted Successfully!</h3><p>Your complaint has been sent to <strong id="sentToDisplay">Hostel Warden</strong></p><button class="btn btn-primary" onclick="closeModal('successModal'); showDashboardTab();">Go to Dashboard</button></div></div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/aco-scheduler.js"></script>
+    <script src="js/complaints.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

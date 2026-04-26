@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Hostel Complaint System - Report Issues, Get Solutions</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="landing-container">
+        <header class="landing-header gradient-header">
+            <div class="logo">
+                <i class="fas fa-university"></i>
+                <h1>Hostel Complaint System</h1>
+            </div>
+            <p class="tagline">Report Issues. Get Solutions. Direct to DSSS/VC.</p>
+        </header>
+
+        <main class="hero-section">
+            <div class="hero-content">
+                <h2>Quick Complaint Resolution</h2>
+                <p>Submit hostel issues directly to DSSS or Vice-Chancellor's office</p>
+                
+                <div class="features">
+                    <div class="feature">
+                        <i class="fas fa-bolt"></i>
+                        <h3>Priority Routing</h3>
+                        <p>Urgent issues sent straight to DSSS/VC</p>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-chart-line"></i>
+                        <h3>Live Tracking</h3>
+                        <p>Track your complaint status in real-time</p>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-bell"></i>
+                        <h3>Instant Alerts</h3>
+                        <p>Get notified on resolution updates</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="auth-section">
+                <div class="auth-tabs">
+                    <button class="tab-btn active" onclick="switchTab('login')">Login</button>
+                    <button class="tab-btn" onclick="switchTab('register')">Register</button>
+                </div>
+
+                <div id="loginForm" class="auth-form active">
+                    <div class="login-card">
+                        <h3><i class="fas fa-user-graduate"></i> Student Login</h3>
+                        <form id="studentLoginForm">
+                            <div class="form-group">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="loginEmail" placeholder="School Email Address" required>
+                            </div>
+                            <div class="form-group">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="loginPassword" placeholder="Password" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">
+                                <i class="fas fa-sign-in-alt"></i> Login as Student
+                            </button>
+                        </form>
+                        <div class="divider">OR</div>
+                        <div class="admin-login-section">
+                            <h4><i class="fas fa-user-tie"></i> Admin Access</h4>
+                            <div class="admin-options">
+                                <button class="btn btn-secondary" onclick="showAdminPasswordModal('dsss')">
+                                    <i class="fas fa-user-shield"></i> DSSS Office
+                                </button>
+                                <button class="btn btn-secondary" onclick="showAdminPasswordModal('vc')">
+                                    <i class="fas fa-crown"></i> VC Office
+                                </button>
+                                <button class="btn btn-secondary" onclick="showAdminPasswordModal('warden')">
+                                    <i class="fas fa-user-tie"></i> Hostel Warden
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="registerForm" class="auth-form">
+                    <div class="login-card">
+                        <h3><i class="fas fa-user-plus"></i> Student Registration</h3>
+                        <form id="studentRegisterForm">
+                            <div class="form-group">
+                                <i class="fas fa-user"></i>
+                                <input type="text" id="regFullName" placeholder="Full Name" required>
+                            </div>
+                            <div class="form-group">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="regEmail" placeholder="School Email Address" required>
+                            </div>
+                            <div class="form-group">
+                                <i class="fas fa-hashtag"></i>
+                                <input type="text" id="regStudentId" placeholder="Matric Number" required>
+                            </div>
+                            <div class="form-group">
+                                <i class="fas fa-building"></i>
+                                <select id="regHostelBlock" required>
+                                    <option value="">Select Hostel</option>
+                                    <option value="QUEEN ESTHER">QUEEN ESTHER</option>
+                                    <option value="PROPHET MOSES">PROPHET MOSES</option>
+                                    <option value="ENGINEERING BOYS">ENGINEERING BOYS (JOSHUA HALL)</option>
+                                    <option value="ENGINEERING GIRLS">ENGINEERING GIRLS (DEBORAH HALL)</option>
+                                    <option value="EXTENTION BOYS">EXTENSION BOYS</option>
+                                    <option value="EXTENTION GIRLS">EXTENSION GIRLS</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <i class="fas fa-door-open"></i>
+                                <input type="text" id="regRoomNumber" placeholder="Block/Room Number" required>
+                            </div>
+                            <div class="form-group">
+                                <i class="fas fa-phone"></i>
+                                <input type="tel" id="regPhone" placeholder="Phone Number (Optional)">
+                            </div>
+                            <div class="form-group">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="regPassword" placeholder="Password" required>
+                            </div>
+                            <div class="form-group">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="regConfirmPassword" placeholder="Confirm Password" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">
+                                <i class="fas fa-user-plus"></i> Create Account
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <section class="emergency-section">
+            <h3><i class="fas fa-phone-alt"></i> Emergency Contacts</h3>
+            <div class="contacts">
+                <div class="contact"><i class="fas fa-user-shield"></i> <strong>DSSS Office:</strong> 011-234-5678</div>
+                <div class="contact"><i class="fas fa-crown"></i> <strong>VC Office:</strong> 011-234-5679</div>
+                <div class="contact"><i class="fas fa-shield-alt"></i> <strong>Security:</strong> 011-234-5680</div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Admin Password Modal -->
+    <div id="adminPasswordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-lock"></i> Admin Authentication</h3>
+                <button class="modal-close" onclick="closeModal('adminPasswordModal')">&times;</button>
+            </div>
+            <div style="padding: 20px;">
+                <p>Enter password to access <strong id="adminTypeDisplay"></strong> dashboard</p>
+                <div class="form-group">
+                    <i class="fas fa-key"></i>
+                    <input type="password" id="adminPassword" placeholder="Admin Password" style="padding-left: 45px;">
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeModal('adminPasswordModal')">Cancel</button>
+                    <button class="btn btn-primary" onclick="verifyAdminLogin()">Verify & Login</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

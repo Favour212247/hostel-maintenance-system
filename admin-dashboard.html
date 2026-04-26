@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Admin Dashboard - Hostel Complaint System</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <button class="mobile-menu-toggle" id="mobileMenuToggle"><i class="fas fa-bars"></i></button>
+
+    <nav class="navbar">
+        <div class="nav-left"><div class="logo"><i class="fas fa-university"></i><span>Admin Portal</span></div></div>
+        <div class="nav-right">
+            <div class="user-info"><i class="fas fa-user-shield"></i><span id="adminName">Admin User</span><span class="badge" id="adminRole">DSSS Office</span></div>
+            <button class="btn btn-small btn-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </div>
+    </nav>
+
+    <div class="dashboard-container">
+        <aside class="sidebar" id="sidebar">
+            <ul class="sidebar-menu">
+                <li class="active" data-tab="dashboard"><a href="#"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                <li data-tab="complaints"><a href="#"><i class="fas fa-list"></i> All Complaints</a></li>
+                <li data-tab="pending"><a href="#"><i class="fas fa-clock"></i> Pending</a></li>
+                <li data-tab="urgent"><a href="#"><i class="fas fa-exclamation-triangle"></i> Urgent</a></li>
+                <li data-tab="resolved"><a href="#"><i class="fas fa-check-circle"></i> Resolved</a></li>
+                <li data-tab="students"><a href="#"><i class="fas fa-users"></i> Students</a></li>
+                <li data-tab="technicians"><a href="#"><i class="fas fa-wrench"></i> Technicians</a></li>
+                <li data-tab="aco-config"><a href="#"><i class="fas fa-robot"></i> ACO Config</a></li>
+            </ul>
+        </aside>
+
+        <main class="main-content">
+            <div id="dashboardTab" class="tab-content active">
+                <div class="stats-cards">
+                    <div class="stat-card"><h3 id="totalComplaints">0</h3><p>Total Complaints</p><i class="fas fa-chart-line"></i></div>
+                    <div class="stat-card pending"><h3 id="pendingCount">0</h3><p>Pending</p><i class="fas fa-clock"></i></div>
+                    <div class="stat-card in-progress"><h3 id="inProgressCount">0</h3><p>In Progress</p><i class="fas fa-tools"></i></div>
+                    <div class="stat-card resolved"><h3 id="resolvedCount">0</h3><p>Resolved</p><i class="fas fa-check-circle"></i></div>
+                </div>
+                <div class="filter-bar">
+                    <select id="statusFilter" onchange="filterAdminComplaints()"><option value="all">All Status</option><option value="pending">Pending</option><option value="in-progress">In Progress</option><option value="resolved">Resolved</option></select>
+                    <select id="priorityFilter" onchange="filterAdminComplaints()"><option value="all">All Priorities</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="emergency">Emergency</option></select>
+                </div>
+                <div class="complaints-list" id="adminComplaintsList"><div class="loading">Loading complaints...</div></div>
+            </div>
+
+            <div id="studentsTab" class="tab-content"><div class="students-section"><h2><i class="fas fa-users"></i> Registered Students</h2><div class="students-list" id="studentsList"><div class="loading">Loading students...</div></div></div></div>
+
+            <div id="techniciansTab" class="tab-content">
+                <div class="technicians-section"><h2><i class="fas fa-wrench"></i> Manage Technicians</h2><button class="btn btn-primary" onclick="showAddTechnicianModal()"><i class="fas fa-plus"></i> Add Technician</button>
+                <div class="technicians-list" id="techniciansList"><div class="loading">Loading technicians...</div></div></div>
+            </div>
+
+            <div id="acoConfigTab" class="tab-content">
+                <div class="config-section"><h2><i class="fas fa-robot"></i> ACO Algorithm Configuration</h2>
+                <div class="form-section"><h3>Ant Colony Optimization Parameters</h3>
+                <div class="form-group"><label>Number of Ants</label><input type="number" id="acoAnts" value="20" min="5" max="100"></div>
+                <div class="form-group"><label>Alpha (Pheromone Importance)</label><input type="number" id="acoAlpha" value="1.0" step="0.1" min="0.1" max="5"></div>
+                <div class="form-group"><label>Beta (Heuristic Importance)</label><input type="number" id="acoBeta" value="2.0" step="0.1" min="0.1" max="5"></div>
+                <div class="form-group"><label>Evaporation Rate</label><input type="number" id="acoRho" value="0.5" step="0.05" min="0.05" max="0.95"></div>
+                <div class="form-group"><label>Q Factor (Pheromone Deposit)</label><input type="number" id="acoQ" value="100" step="10" min="10" max="500"></div>
+                <div class="form-group"><label>Iterations</label><input type="number" id="acoIterations" value="50" min="10" max="500"></div>
+                <button class="btn btn-primary" onclick="saveAcoConfig()">Save Configuration</button>
+                <button class="btn btn-secondary" onclick="runManualAllocation()">Run Manual Allocation</button></div>
+                <div id="allocationResult" class="allocation-result"></div></div>
+            </div>
+        </main>
+    </div>
+
+    <div id="updateModal" class="modal"><div class="modal-content"><div class="modal-header"><h3>Update Complaint Status</h3><button class="modal-close" onclick="closeModal('updateModal')">&times;</button></div><p>Complaint: <strong id="updateComplaintId"></strong></p><select id="newStatus" class="form-control"><option value="pending">Pending</option><option value="in-progress">In Progress</option><option value="resolved">Resolved</option></select><div class="form-group"><label>Add Response/Remarks (Optional)</label><textarea id="adminRemarks" rows="3" placeholder="Add any remarks or response for the student..."></textarea></div><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('updateModal')">Cancel</button><button class="btn btn-primary" onclick="updateComplaintStatus()">Update Status</button></div></div></div>
+
+    <div id="addTechnicianModal" class="modal"><div class="modal-content"><div class="modal-header"><h3>Add New Technician</h3><button class="modal-close" onclick="closeModal('addTechnicianModal')">&times;</button></div><div class="form-group"><label>Full Name</label><input type="text" id="techName" placeholder="Technician Name"></div><div class="form-group"><label>Specialization</label><select id="techSpecialization"><option value="electrician">Electrician</option><option value="plumber">Plumber</option><option value="carpenter">Carpenter</option><option value="general">General Maintenance</option><option value="hvac">HVAC</option><option value="security">Security</option></select></div><div class="form-group"><label>Phone Number</label><input type="tel" id="techPhone" placeholder="Phone Number"></div><div class="form-group"><label>Zone</label><select id="techZone"><option value="A">Zone A (QUEEN ESTHER)</option><option value="B">Zone B (PROPHET MOSES)</option><option value="C">Zone C (ENGINEERING BOYS)</option><option value="D">Zone D (ENGINEERING GIRLS)</option><option value="E">Zone E (EXTENTION BOYS)</option><option value="F">Zone F (EXTENTION GIRLS)</option></select></div><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('addTechnicianModal')">Cancel</button><button class="btn btn-primary" onclick="addTechnician()">Add Technician</button></div></div></div>
+
+    <div id="viewModal" class="modal"><div class="modal-content modal-large"><div class="modal-header"><h3>Complaint Details</h3><button class="modal-close" onclick="closeModal('viewModal')">&times;</button></div><div id="complaintDetails"></div></div></div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/aco-scheduler.js"></script>
+    <script src="js/complaints.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

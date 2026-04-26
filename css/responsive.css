@@ -1,0 +1,45 @@
+@media (max-width: 640px) {
+    .hero-section { grid-template-columns: 1fr; gap: 20px; }
+    .features { grid-template-columns: 1fr; }
+    .hero-content h2 { font-size: 1.5rem; }
+    .auth-form { padding: 20px; }
+    .tab-btn { padding: 12px; font-size: 0.9rem; }
+    .navbar { padding: 12px 15px; flex-wrap: wrap; }
+    .nav-right { gap: 10px; }
+    .user-info span:not(.badge) { display: none; }
+    .sidebar { position: fixed; left: -260px; top: 70px; height: calc(100vh - 70px); z-index: 99; transition: left 0.3s ease; }
+    .sidebar.open { left: 0; }
+    .mobile-menu-toggle { display: block; position: fixed; bottom: 20px; right: 20px; z-index: 100; background: var(--primary); color: white; border: none; width: 50px; height: 50px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; box-shadow: var(--shadow-lg); }
+    .main-content { padding: 15px; }
+    .stats-cards { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .priority-options { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .form-section { padding: 15px; }
+    .form-actions { flex-direction: column; }
+    .form-actions .btn { width: 100%; justify-content: center; }
+    .complaint-header { flex-direction: column; }
+    .complaint-actions { flex-direction: column; }
+    .complaint-actions .btn { width: 100%; justify-content: center; }
+    .filter-bar, .filter-options { flex-direction: column; }
+    .filter-bar select, .filter-options select { width: 100%; }
+    .modal-content { width: 95%; margin: 10px; }
+}
+
+@media (min-width: 641px) and (max-width: 768px) {
+    .hero-section { grid-template-columns: 1fr; gap: 30px; }
+    .features { grid-template-columns: repeat(3, 1fr); }
+    .stats-cards { grid-template-columns: repeat(2, 1fr); }
+    .priority-options { grid-template-columns: repeat(2, 1fr); }
+}
+
+.mobile-menu-toggle { display: none; }
+
+@media (hover: none) and (pointer: coarse) {
+    .btn, .sidebar-menu li a, .complaint-actions .btn, .priority-option { min-height: 44px; }
+    input, select, textarea { font-size: 16px; }
+}
+
+@media print {
+    .navbar, .sidebar, .quick-actions, .complaint-actions, .filter-bar, .btn, .mobile-menu-toggle { display: none; }
+    .main-content { padding: 0; margin: 0; }
+    .complaint-card { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; }
+}

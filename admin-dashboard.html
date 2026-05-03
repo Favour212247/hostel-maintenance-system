@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -8,66 +9,276 @@
     <link rel="stylesheet" href="css/responsive.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+
 <body>
     <button class="mobile-menu-toggle" id="mobileMenuToggle"><i class="fas fa-bars"></i></button>
 
     <nav class="navbar">
-        <div class="nav-left"><div class="logo"><i class="fas fa-university"></i><span>Admin Portal</span></div></div>
+        <div class="nav-left">
+            <div class="logo">
+                <i class="fas fa-university"></i>
+                <span>Admin Portal</span>
+            </div>
+        </div>
         <div class="nav-right">
-            <div class="user-info"><i class="fas fa-user-shield"></i><span id="adminName">Admin User</span><span class="badge" id="adminRole">DSSS Office</span></div>
-            <button class="btn btn-small btn-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            <div class="user-info">
+                <i class="fas fa-user-shield"></i>
+                <span id="adminName">Admin User</span>
+                <span class="badge" id="adminRole">DSSS Office</span>
+            </div>
+            <button class="btn btn-small btn-logout" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
         </div>
     </nav>
 
     <div class="dashboard-container">
         <aside class="sidebar" id="sidebar">
             <ul class="sidebar-menu">
-                <li class="active" data-tab="dashboard"><a href="#"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-                <li data-tab="complaints"><a href="#"><i class="fas fa-list"></i> All Complaints</a></li>
-                <li data-tab="students"><a href="#"><i class="fas fa-users"></i> Students</a></li>
-                <li data-tab="technicians"><a href="#"><i class="fas fa-wrench"></i> Technicians</a></li>
+                <li class="active" data-tab="dashboard">
+                    <a href="#"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                </li>
+                <li data-tab="complaints">
+                    <a href="#"><i class="fas fa-list"></i> All Complaints</a>
+                </li>
+                <li data-tab="students">
+                    <a href="#"><i class="fas fa-users"></i> Students</a>
+                </li>
+                <li data-tab="technicians">
+                    <a href="#"><i class="fas fa-wrench"></i> Technicians</a>
+                </li>
+                <li data-tab="email-logs">
+                    <a href="#"><i class="fas fa-envelope"></i> Email Logs</a>
+                </li>
             </ul>
         </aside>
 
         <main class="main-content">
+            <!-- Dashboard Tab -->
             <div id="dashboardTab" class="tab-content active">
                 <div class="stats-cards">
-                    <div class="stat-card"><h3 id="totalComplaints">0</h3><p>Total Complaints</p><i class="fas fa-chart-line"></i></div>
-                    <div class="stat-card pending"><h3 id="pendingCount">0</h3><p>Pending</p><i class="fas fa-clock"></i></div>
-                    <div class="stat-card in-progress"><h3 id="inProgressCount">0</h3><p>In Progress</p><i class="fas fa-tools"></i></div>
-                    <div class="stat-card resolved"><h3 id="resolvedCount">0</h3><p>Resolved</p><i class="fas fa-check-circle"></i></div>
+                    <div class="stat-card">
+                        <h3 id="totalComplaints">0</h3>
+                        <p>Total Complaints</p>
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="stat-card pending">
+                        <h3 id="pendingCount">0</h3>
+                        <p>Pending</p>
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-card in-progress">
+                        <h3 id="inProgressCount">0</h3>
+                        <p>In Progress</p>
+                        <i class="fas fa-tools"></i>
+                    </div>
+                    <div class="stat-card resolved">
+                        <h3 id="resolvedCount">0</h3>
+                        <p>Resolved</p>
+                        <i class="fas fa-check-circle"></i>
+                    </div>
                 </div>
+
                 <div class="filter-bar">
-                    <select id="statusFilter" onchange="filterAdminComplaints()"><option value="all">All Status</option><option value="pending">Pending</option><option value="in-progress">In Progress</option><option value="resolved">Resolved</option></select>
-                    <select id="priorityFilter" onchange="filterAdminComplaints()"><option value="all">All Priorities</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="emergency">Emergency</option></select>
-                    <button class="btn btn-primary" onclick="runManualAllocation()"><i class="fas fa-robot"></i> Run ACO Allocation</button>
+                    <select id="statusFilter" onchange="filterAdminComplaints()">
+                        <option value="all">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="assigned">Assigned</option>
+                    </select>
+                    <select id="priorityFilter" onchange="filterAdminComplaints()">
+                        <option value="all">All Priorities</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="emergency">Emergency</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="runManualAllocation()">
+                        <i class="fas fa-robot"></i> Run ACO Allocation
+                    </button>
                 </div>
-                <div class="complaints-list" id="adminComplaintsList"><div class="loading">Loading complaints...</div></div>
+
+                <div class="complaints-list" id="adminComplaintsList">
+                    <div class="loading">Loading complaints...</div>
+                </div>
                 <div id="allocationResult" class="allocation-result" style="margin-top: 20px;"></div>
             </div>
 
-            <div id="studentsTab" class="tab-content"><div class="students-section"><h2><i class="fas fa-users"></i> Registered Students</h2><div class="students-list" id="studentsList"><div class="loading">Loading students...</div></div></div></div>
+            <!-- Students Tab -->
+            <div id="studentsTab" class="tab-content">
+                <div class="students-section">
+                    <h2><i class="fas fa-users"></i> Registered Students</h2>
+                    <div class="students-list" id="studentsList">
+                        <div class="loading">Loading students...</div>
+                    </div>
+                </div>
+            </div>
 
+            <!-- Technicians Tab -->
             <div id="techniciansTab" class="tab-content">
-                <div class="technicians-section"><h2><i class="fas fa-wrench"></i> Manage Technicians</h2><button class="btn btn-primary" onclick="showAddTechnicianModal()"><i class="fas fa-plus"></i> Add Technician</button>
-                <div class="technicians-list" id="techniciansList"><div class="loading">Loading technicians...</div></div></div>
+                <div class="technicians-section">
+                    <h2><i class="fas fa-wrench"></i> Manage Technicians</h2>
+                    <button class="btn btn-primary" onclick="showAddTechnicianModal()">
+                        <i class="fas fa-plus"></i> Add Technician
+                    </button>
+                    <div class="technicians-list" id="techniciansList">
+                        <div class="loading">Loading technicians...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Email Logs Tab -->
+            <div id="emailLogsTab" class="tab-content">
+                <div class="email-logs-section">
+                    <h2><i class="fas fa-envelope"></i> Email Notification Logs</h2>
+                    <div class="filter-bar" style="margin-bottom: 15px;">
+                        <select id="emailLogFilter" onchange="loadEmailLogs()">
+                            <option value="all">All Status</option>
+                            <option value="sent">Sent</option>
+                            <option value="failed">Failed</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="loadEmailLogs()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="email-logs-list" id="emailLogsList">
+                        <div class="loading">Loading email logs...</div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
 
-    <div id="updateModal" class="modal"><div class="modal-content"><div class="modal-header"><h3>Update Complaint Status</h3><button class="modal-close" onclick="closeModal('updateModal')">&times;</button></div><p>Complaint: <strong id="updateComplaintId"></strong></p>
-    <div class="form-group"><label>New Status</label><select id="newStatus" class="form-control"><option value="pending">Pending</option><option value="in-progress">In Progress</option><option value="resolved">Resolved</option></select></div>
-    <div class="form-group"><label>Priority (ACO Auto-detected)</label><select id="prioritySelect"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="emergency">Emergency</option></select></div>
-    <div class="form-group"><label>Assign To Technician</label><select id="assignTechnicianSelect"><option value="">Unassigned</option></select></div>
-    <div class="form-group"><label>Add Response/Remarks (Optional)</label><textarea id="adminRemarks" rows="3" placeholder="Add any remarks or response for the student..."></textarea></div>
-    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('updateModal')">Cancel</button><button class="btn btn-primary" onclick="updateComplaintStatus()">Update</button></div></div></div>
+    <!-- Update Complaint Modal -->
+    <div id="updateModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Update Complaint Status</h3>
+                <button class="modal-close" onclick="closeModal('updateModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Complaint: <strong id="updateComplaintId"></strong></p>
+                <div class="form-group">
+                    <label>New Status</label>
+                    <select id="newStatus" class="form-control">
+                        <option value="pending">Pending</option>
+                        <option value="assigned">Assigned</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Priority (ACO Auto-detected)</label>
+                    <select id="prioritySelect">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="emergency">Emergency</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Assign To Technician</label>
+                    <select id="assignTechnicianSelect">
+                        <option value="">Unassigned</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Add Response/Remarks (Optional)</label>
+                    <textarea id="adminRemarks" rows="3"
+                        placeholder="Add any remarks or response for the student..."></textarea>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('updateModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="updateComplaintStatus()">Update</button>
+            </div>
+        </div>
+    </div>
 
-    <div id="addTechnicianModal" class="modal"><div class="modal-content"><div class="modal-header"><h3>Add New Technician</h3><button class="modal-close" onclick="closeModal('addTechnicianModal')">&times;</button></div><div class="form-group"><label>Full Name</label><input type="text" id="techName" placeholder="Technician Name"></div><div class="form-group"><label>Specialization</label><select id="techSpecialization"><option value="electrician">Electrician</option><option value="plumber">Plumber</option><option value="carpenter">Carpenter</option><option value="general">General Maintenance</option><option value="hvac">HVAC</option><option value="security">Security</option></select></div><div class="form-group"><label>Phone Number</label><input type="tel" id="techPhone" placeholder="Phone Number"></div><div class="form-group"><label>Zone</label><select id="techZone"><option value="A">Zone A (QUEEN ESTHER)</option><option value="B">Zone B (PROPHET MOSES)</option><option value="C">Zone C (ENGINEERING BOYS)</option><option value="D">Zone D (ENGINEERING GIRLS)</option><option value="E">Zone E (EXTENTION BOYS)</option><option value="F">Zone F (EXTENTION GIRLS)</option></select></div><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('addTechnicianModal')">Cancel</button><button class="btn btn-primary" onclick="addTechnician()">Add Technician</button></div></div></div>
+    <!-- Add Technician Modal (UPDATED WITH EMAIL FIELD) -->
+    <div id="addTechnicianModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-plus"></i> Add New Technician</h3>
+                <button class="modal-close" onclick="closeModal('addTechnicianModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label><i class="fas fa-user"></i> Full Name *</label>
+                    <input type="text" id="techName" placeholder="e.g., John Smith" required>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-envelope"></i> Email Address *</label>
+                    <input type="email" id="techEmail" placeholder="technician@example.com" required>
+                    <small style="color: #666;">Emails will be sent to this address when complaints are assigned</small>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-tools"></i> Specialization *</label>
+                    <select id="techSpecialization" required>
+                        <option value="">Select Specialization</option>
+                        <option value="electrician">⚡ Electrician</option>
+                        <option value="plumber">🚰 Plumber</option>
+                        <option value="carpenter">🪚 Carpenter</option>
+                        <option value="general">🔧 General Maintenance</option>
+                        <option value="hvac">❄️ HVAC</option>
+                        <option value="security">🛡️ Security</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-phone"></i> Phone Number (Optional)</label>
+                    <input type="tel" id="techPhone" placeholder="e.g., 08012345678">
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-map-marker-alt"></i> Zone *</label>
+                    <select id="techZone" required>
+                        <option value="">Select Zone</option>
+                        <option value="A">Zone A (QUEEN ESTHER)</option>
+                        <option value="B">Zone B (PROPHET MOSES)</option>
+                        <option value="C">Zone C (ENGINEERING BOYS)</option>
+                        <option value="D">Zone D (ENGINEERING GIRLS)</option>
+                        <option value="E">Zone E (EXTENTION BOYS)</option>
+                        <option value="F">Zone F (EXTENTION GIRLS)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('addTechnicianModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="addTechnician()">
+                    <i class="fas fa-save"></i> Add Technician
+                </button>
+            </div>
+        </div>
+    </div>
 
-    <div id="viewModal" class="modal"><div class="modal-content modal-large"><div class="modal-header"><h3>Complaint Details</h3><button class="modal-close" onclick="closeModal('viewModal')">&times;</button></div><div id="complaintDetails"></div></div></div>
+    <!-- View Complaint Modal -->
+    <div id="viewModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Complaint Details</h3>
+                <button class="modal-close" onclick="closeModal('viewModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="complaintDetails">
+                <div class="loading">Loading details...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="modal">
+        <div class="modal-content success-modal">
+            <i class="fas fa-check-circle"></i>
+            <h3>Complaint Submitted Successfully!</h3>
+            <p>Our ACO system has analyzed and routed your complaint to the appropriate department.</p>
+            <p>You will receive updates via notifications.</p>
+            <button class="btn btn-primary" onclick="closeModal('successModal'); showDashboardTab();">Go to
+                Dashboard</button>
+        </div>
+    </div>
 
     <div id="toast" class="toast"></div>
 
+    <!-- Scripts -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -77,5 +288,90 @@
     <script src="js/complaints.js"></script>
     <script src="js/admin.js"></script>
     <script src="js/main.js"></script>
+
+    <script>
+        // Additional function to load email logs
+        async function loadEmailLogs() {
+            try {
+                const snapshot = await db.collection('emailLogs')
+                    .orderBy('sentAt', 'desc')
+                    .limit(50)
+                    .get();
+
+                const logs = [];
+                snapshot.forEach(doc => {
+                    logs.push({ id: doc.id, ...doc.data() });
+                });
+
+                const container = document.getElementById('emailLogsList');
+                if (!container) return;
+
+                if (logs.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-envelope"></i><p>No email logs found. Emails will appear here when sent.</p></div>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <div class="email-logs-table">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: left; padding: 10px; background: #f5f5f5;">Time</th>
+                                    <th style="text-align: left; padding: 10px; background: #f5f5f5;">Technician</th>
+                                    <th style="text-align: left; padding: 10px; background: #f5f5f5;">Complaint</th>
+                                    <th style="text-align: left; padding: 10px; background: #f5f5f5;">Priority</th>
+                                    <th style="text-align: left; padding: 10px; background: #f5f5f5;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${logs.map(log => `
+                                    <tr style="border-bottom: 1px solid #eee;">
+                                        <td style="padding: 10px;">${formatDate(log.sentAt)}</td>
+                                        <td style="padding: 10px;">${escapeHtml(log.technicianName || log.technicianEmail)}</td>
+                                        <td style="padding: 10px;">${escapeHtml(log.complaintTitle?.substring(0, 40) || 'N/A')}</td>
+                                        <td style="padding: 10px;">
+                                            <span class="complaint-priority priority-${log.priority || 'low'}">${(log.priority || 'low').toUpperCase()}</span>
+                                        </td>
+                                        <td style="padding: 10px;">
+                                            ${log.status === 'sent' ?
+                        '<span style="color: green;"><i class="fas fa-check-circle"></i> Sent</span>' :
+                        '<span style="color: red;"><i class="fas fa-times-circle"></i> Failed</span>'}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error('Error loading email logs:', error);
+                const container = document.getElementById('emailLogsList');
+                if (container) {
+                    container.innerHTML = '<div class="error-state">Error loading logs: ' + error.message + '</div>';
+                }
+            }
+        }
+
+        // Override the tab setup to include email logs
+        const originalSetupTabs = setupTabs;
+        window.setupTabs = function () {
+            originalSetupTabs();
+
+            // Add email logs tab handler
+            const emailLogsMenuItem = document.querySelector('[data-tab="email-logs"]');
+            if (emailLogsMenuItem) {
+                emailLogsMenuItem.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    if (typeof loadEmailLogs === 'function') {
+                        setTimeout(loadEmailLogs, 100);
+                    }
+                });
+            }
+        };
+
+        console.log('✅ Admin dashboard loaded with email notification support');
+    </script>
 </body>
+
 </html>

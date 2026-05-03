@@ -1,4 +1,4 @@
-// Admin Dashboard Functions
+// Admin Dashboard Functions with Email Notifications
 
 document.addEventListener('DOMContentLoaded', () => {
     if (window.location.pathname.includes('admin-dashboard.html')) {
@@ -10,6 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Google Apps Script URL for email notifications
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz8M5XXQ2w8SamyORGAlFhC9PT2n3l7bj1E7xQKdlCkKh4YQ4RWo6k0J1P6S417uNBqSg/exec';
+
 // Export functions globally
 window.loadAllComplaints = loadAllComplaints;
 window.filterAdminComplaints = filterAdminComplaints;
@@ -18,6 +21,8 @@ window.updateComplaintStatus = updateComplaintStatus;
 window.viewComplaintDetails = viewComplaintDetails;
 window.runACOForComplaint = runACOForComplaint;
 window.deleteTechnician = deleteTechnician;
+window.addTechnician = addTechnician;
+window.showAddTechnicianModal = showAddTechnicianModal;
 
 async function loadAdminDashboard() {
     const user = getCurrentUser();
@@ -45,13 +50,7 @@ async function loadAllComplaints() {
     try {
         console.log('Loading all complaints for admin...');
 
-        // First, check if there are any complaints at all
-        const testSnapshot = await db.collection('complaints').limit(1).get();
-        console.log('Complaints collection exists?', !testSnapshot.empty);
-
-        const snapshot = await db.collection('complaints')
-            .orderBy('createdAt', 'desc')
-            .get();
+        const snapshot = await db.collection('complaints').get();
 
         const complaints = [];
         snapshot.forEach(doc => {
@@ -61,6 +60,13 @@ async function loadAllComplaints() {
                 ...data,
                 createdAt: data.createdAt
             });
+        });
+
+        // Sort manually
+        complaints.sort((a, b) => {
+            const dateA = a.createdAt?.toDate?.() || new Date(0);
+            const dateB = b.createdAt?.toDate?.() || new Date(0);
+            return dateB - dateA;
         });
 
         console.log(`Found ${complaints.length} total complaints`);
@@ -161,7 +167,6 @@ async function showUpdateModal(complaintId) {
     const updateIdEl = document.getElementById('updateComplaintId');
     if (updateIdEl) updateIdEl.textContent = complaintId.slice(-6);
 
-    // Load current complaint data
     try {
         const complaintDoc = await db.collection('complaints').doc(complaintId).get();
         const complaint = complaintDoc.data();
@@ -198,16 +203,85 @@ async function loadTechniciansForSelect() {
         select.innerHTML = '<option value="">Unassigned</option>';
         snapshot.forEach(doc => {
             const tech = doc.data();
-            select.innerHTML += `<option value="${doc.id}">${escapeHtml(tech.name)} (${tech.specialization})</option>`;
+            select.innerHTML += `<option value="${doc.id}">${escapeHtml(tech.name)} (${tech.specialization}) - ${tech.email || 'No email'}</option>`;
         });
     } catch (error) {
         console.error('Error loading technicians for select:', error);
     }
 }
 
+// ========================================
+// EMAIL NOTIFICATION FUNCTION
+// ========================================
+
+async function sendEmailToTechnician(technician, complaint, complaintId) {
+    try {
+        console.log(`Sending email to ${technician.name} (${technician.email})`);
+
+        const emailData = {
+            technicianEmail: technician.email,
+            technicianName: technician.name,
+            technicianPhone: technician.phone || '',
+            complaintId: complaintId.slice(-6),
+            complaintTitle: complaint.title,
+            priority: complaint.priority,
+            studentName: complaint.studentName,
+            roomNumber: complaint.studentRoom,
+            hostelBlock: complaint.hostelBlock,
+            category: complaint.category,
+            description: complaint.description,
+            createdAt: new Date().toLocaleString()
+        };
+
+        // Send to Google Apps Script
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(emailData)
+        });
+
+        console.log(`✅ Email sent successfully to ${technician.email}`);
+
+        // Log to Firestore
+        await db.collection('emailLogs').add({
+            technicianId: technician.id,
+            technicianEmail: technician.email,
+            technicianName: technician.name,
+            complaintId: complaintId,
+            complaintTitle: complaint.title,
+            priority: complaint.priority,
+            sentAt: firebase.firestore.FieldValue.serverTimestamp(),
+            status: 'sent'
+        });
+
+        return true;
+
+    } catch (error) {
+        console.error('❌ Email sending failed:', error);
+
+        await db.collection('emailLogs').add({
+            technicianId: technician.id,
+            technicianEmail: technician.email,
+            complaintId: complaintId,
+            error: error.message,
+            sentAt: firebase.firestore.FieldValue.serverTimestamp(),
+            status: 'failed'
+        });
+
+        return false;
+    }
+}
+
+// ========================================
+// ACO ASSIGNMENT WITH EMAIL NOTIFICATION
+// ========================================
+
 async function runACOForComplaint(complaintId) {
     try {
-        showToast('Running ACO optimization for this complaint...', 'info');
+        showToast('🔄 Running ACO optimization...', 'info');
 
         const complaintDoc = await db.collection('complaints').doc(complaintId).get();
         const complaint = { id: complaintId, ...complaintDoc.data() };
@@ -215,14 +289,16 @@ async function runACOForComplaint(complaintId) {
         const techniciansSnapshot = await db.collection('technicians').where('isActive', '==', true).get();
         const technicians = [];
         techniciansSnapshot.forEach(doc => {
-            technicians.push({ id: doc.id, ...doc.data(), currentWorkload: 0 });
+            const tech = doc.data();
+            technicians.push({ id: doc.id, ...tech, currentWorkload: 0 });
         });
 
         if (technicians.length === 0) {
-            showToast('No technicians available for assignment', 'error');
+            showToast('No technicians available', 'error');
             return;
         }
 
+        // Get current workloads
         const taskSnapshot = await db.collection('tasks')
             .where('status', 'in', ['assigned', 'in-progress'])
             .get();
@@ -233,6 +309,7 @@ async function runACOForComplaint(complaintId) {
             if (tech) tech.currentWorkload++;
         });
 
+        // Run ACO algorithm
         const aco = new AntColonyOptimizer([complaint], technicians, acoConfig);
         const result = await aco.optimize();
 
@@ -240,6 +317,7 @@ async function runACOForComplaint(complaintId) {
             const assignedTechId = result.assignment[complaintId];
             const assignedTech = technicians.find(t => t.id === assignedTechId);
 
+            // Update complaint with assigned technician
             await db.collection('complaints').doc(complaintId).update({
                 assignedTo: assignedTechId,
                 assignedToName: assignedTech.name,
@@ -247,6 +325,7 @@ async function runACOForComplaint(complaintId) {
                 status: 'assigned'
             });
 
+            // Create task record
             await db.collection('tasks').add({
                 complaintId: complaintId,
                 technicianId: assignedTechId,
@@ -255,25 +334,42 @@ async function runACOForComplaint(complaintId) {
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
+            // SEND EMAIL NOTIFICATION TO TECHNICIAN
+            let emailSent = false;
+            if (assignedTech.email) {
+                emailSent = await sendEmailToTechnician(assignedTech, complaint, complaintId);
+                if (emailSent) {
+                    showToast(`✅ Assigned to ${assignedTech.name} - Email sent!`, 'success');
+                } else {
+                    showToast(`⚠️ Assigned to ${assignedTech.name} but email failed`, 'warning');
+                }
+            } else {
+                showToast(`⚠️ Assigned to ${assignedTech.name} - No email address on file`, 'warning');
+            }
+
+            // Notify student
             await db.collection('notifications').add({
                 userId: complaint.studentId,
-                title: 'Complaint Assigned via ACO',
-                message: `Your complaint "${complaint.title}" has been assigned to ${assignedTech.name} (${assignedTech.specialization})`,
+                title: 'Complaint Assigned',
+                message: `Your complaint "${complaint.title}" has been assigned to ${assignedTech.name}. ${emailSent ? 'They have been notified by email.' : 'Please check back for updates.'}`,
                 read: false,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            showToast(`✅ Complaint assigned to ${assignedTech.name} via ACO`, 'success');
             loadAllComplaints();
         } else {
             showToast('ACO could not find a suitable technician', 'info');
         }
 
     } catch (error) {
-        console.error('ACO assignment error:', error);
-        showToast('Error running ACO: ' + error.message, 'error');
+        console.error('ACO error:', error);
+        showToast('Error: ' + error.message, 'error');
     }
 }
+
+// ========================================
+// MANUAL ASSIGNMENT WITH EMAIL NOTIFICATION
+// ========================================
 
 async function updateComplaintStatus() {
     const newStatus = document.getElementById('newStatus').value;
@@ -290,17 +386,29 @@ async function updateComplaintStatus() {
             resolvedAt: newStatus === 'resolved' ? firebase.firestore.FieldValue.serverTimestamp() : null
         };
 
+        let assignedTech = null;
+
         if (assignedTo) {
             const techDoc = await db.collection('technicians').doc(assignedTo).get();
             if (techDoc.exists) {
+                assignedTech = { id: techDoc.id, ...techDoc.data() };
                 updateData.assignedTo = assignedTo;
-                updateData.assignedToName = techDoc.data().name;
+                updateData.assignedToName = assignedTech.name;
                 updateData.assignedAt = firebase.firestore.FieldValue.serverTimestamp();
             }
         }
 
         await db.collection('complaints').doc(currentComplaintToUpdate).update(updateData);
 
+        // Send email if assigning to technician and status is assigned/in-progress
+        if (assignedTech && assignedTech.email && (newStatus === 'assigned' || newStatus === 'in-progress')) {
+            const complaintDoc = await db.collection('complaints').doc(currentComplaintToUpdate).get();
+            const complaint = complaintDoc.data();
+            await sendEmailToTechnician(assignedTech, complaint, currentComplaintToUpdate);
+            showToast(`✅ Email sent to ${assignedTech.name}`, 'success');
+        }
+
+        // Notify student
         const complaintDoc = await db.collection('complaints').doc(currentComplaintToUpdate).get();
         const complaint = complaintDoc.data();
 
@@ -308,7 +416,7 @@ async function updateComplaintStatus() {
             await db.collection('notifications').add({
                 userId: complaint.studentId,
                 title: `Complaint ${newStatus === 'resolved' ? 'Resolved' : 'Updated'}`,
-                message: `Your complaint "${complaint.title}" status has been updated to ${newStatus}. Priority: ${newPriority.toUpperCase()}. ${remarks ? 'Remarks: ' + remarks : ''}`,
+                message: `Your complaint "${complaint.title}" status has been updated to ${newStatus}. ${remarks ? 'Remarks: ' + remarks : ''}`,
                 read: false,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
@@ -317,9 +425,7 @@ async function updateComplaintStatus() {
         showToast('Complaint updated successfully', 'success');
         closeModal('updateModal');
 
-        const remarksInput = document.getElementById('adminRemarks');
-        if (remarksInput) remarksInput.value = '';
-
+        document.getElementById('adminRemarks').value = '';
         await loadAllComplaints();
 
         if (typeof loadStudentComplaints === 'function') {
@@ -332,26 +438,44 @@ async function updateComplaintStatus() {
     }
 }
 
+// ========================================
+// TECHNICIAN MANAGEMENT WITH EMAIL FIELD
+// ========================================
+
 async function loadStudents() {
     try {
-        const snapshot = await db.collection('students').orderBy('createdAt', 'desc').get();
+        console.log('Loading students...');
+
+        const snapshot = await db.collection('students').get();
+
         const students = [];
         snapshot.forEach(doc => {
-            students.push({ id: doc.id, ...doc.data() });
+            const data = doc.data();
+            students.push({
+                id: doc.id,
+                ...data,
+                createdAt: data.createdAt
+            });
+        });
+
+        students.sort((a, b) => {
+            const dateA = a.createdAt?.toDate?.() || new Date(0);
+            const dateB = b.createdAt?.toDate?.() || new Date(0);
+            return dateB - dateA;
         });
 
         const container = document.getElementById('studentsList');
         if (!container) return;
 
         if (students.length === 0) {
-            container.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><p>No students registered</p></div>';
+            container.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><p>No students registered yet.</p></div>';
             return;
         }
 
         container.innerHTML = students.map(student => `
             <div class="student-card">
                 <div>
-                    <strong>${escapeHtml(student.fullName)}</strong><br>
+                    <strong>${escapeHtml(student.fullName || 'No Name')}</strong><br>
                     <small>${student.studentId || 'N/A'} | ${student.hostelBlock || 'N/A'} - ${student.roomNumber || 'N/A'}</small><br>
                     <small>${student.email || 'N/A'}</small>
                 </div>
@@ -363,7 +487,7 @@ async function loadStudents() {
 
     } catch (error) {
         console.error('Error loading students:', error);
-        showToast('Error loading students', 'error');
+        showToast('Error loading students: ' + error.message, 'error');
     }
 }
 
@@ -387,7 +511,8 @@ async function loadTechnicians() {
             <div class="technician-card">
                 <div>
                     <strong>${escapeHtml(tech.name)}</strong><br>
-                    <small>${tech.specialization || 'General'} | Zone ${tech.zone || 'A'}</small><br>
+                    <small>📧 ${tech.email || 'No email'}</small><br>
+                    <small>🔧 ${tech.specialization || 'General'} | Zone ${tech.zone || 'A'}</small><br>
                     <small>📞 ${tech.phone || 'No phone'}</small>
                 </div>
                 <div>
@@ -398,7 +523,7 @@ async function loadTechnicians() {
 
     } catch (error) {
         console.error('Error loading technicians:', error);
-        showToast('Error loading technicians', 'error');
+        showToast('Error loading technicians: ' + error.message, 'error');
     }
 }
 
@@ -409,18 +534,26 @@ function showAddTechnicianModal() {
 
 async function addTechnician() {
     const name = document.getElementById('techName').value;
+    const email = document.getElementById('techEmail').value;
     const specialization = document.getElementById('techSpecialization').value;
     const phone = document.getElementById('techPhone').value;
     const zone = document.getElementById('techZone').value;
 
-    if (!name || !specialization || !zone) {
-        showToast('Please fill all required fields', 'error');
+    if (!name || !email || !specialization || !zone) {
+        showToast('Please fill all required fields (Name, Email, Specialization, Zone)', 'error');
+        return;
+    }
+
+    // Basic email validation
+    if (!email.includes('@')) {
+        showToast('Please enter a valid email address', 'error');
         return;
     }
 
     try {
         await db.collection('technicians').add({
             name: name,
+            email: email,
             specialization: specialization,
             phone: phone || '',
             zone: zone,
@@ -428,14 +561,13 @@ async function addTechnician() {
             isActive: true
         });
 
-        showToast('Technician added successfully', 'success');
+        showToast(`✅ Technician ${name} added successfully`, 'success');
         closeModal('addTechnicianModal');
 
-        const techNameInput = document.getElementById('techName');
-        const techPhoneInput = document.getElementById('techPhone');
-
-        if (techNameInput) techNameInput.value = '';
-        if (techPhoneInput) techPhoneInput.value = '';
+        // Clear form
+        document.getElementById('techName').value = '';
+        document.getElementById('techEmail').value = '';
+        document.getElementById('techPhone').value = '';
 
         await loadTechnicians();
         await loadTechniciansForSelect();
@@ -458,6 +590,25 @@ async function deleteTechnician(techId) {
             showToast('Error deleting technician: ' + error.message, 'error');
         }
     }
+}
+
+function getStatusText(status) {
+    const statusMap = {
+        'pending': 'Pending',
+        'assigned': 'Assigned',
+        'in-progress': 'In Progress',
+        'resolved': 'Resolved',
+        'unassigned': 'Unassigned'
+    };
+    return statusMap[status] || status;
+}
+
+function formatDate(timestamp) {
+    if (!timestamp) return 'N/A';
+    if (timestamp.toDate) {
+        return timestamp.toDate().toLocaleString();
+    }
+    return new Date(timestamp).toLocaleString();
 }
 
 window.refreshAdminComplaints = function () {

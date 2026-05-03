@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
         complaintForm.removeEventListener('submit', submitComplaint);
         complaintForm.addEventListener('submit', submitComplaint);
     }
-    
+
     if (window.location.pathname.includes('student-dashboard.html')) {
         setTimeout(() => {
             loadStudentComplaints();
@@ -16,38 +16,76 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Export functions globally
+window.loadStudentComplaints = loadStudentComplaints;
+window.viewComplaintDetails = viewComplaintDetails;
+window.filterComplaints = filterComplaints;
+window.showNewComplaintForm = showNewComplaintForm;
+window.showDashboardTab = showDashboardTab;
+window.showEmergencyForm = showEmergencyForm;
+window.submitEmergency = submitEmergency;
+
 async function loadStudentComplaints() {
     currentStudentUser = getCurrentUser();
-    
+
+    console.log('Loading complaints for student:', currentStudentUser);
+
     if (!currentStudentUser || currentStudentUser.isAdmin) {
         console.log('No student user found or user is admin');
+        // Try to get from Firebase auth instead
+        const firebaseUser = auth.currentUser;
+        if (firebaseUser) {
+            console.log('Firebase user found, attempting to load from there');
+            try {
+                const complaintsSnapshot = await db.collection('complaints')
+                    .where('studentId', '==', firebaseUser.uid)
+                    .orderBy('createdAt', 'desc')
+                    .get();
+
+                const complaints = [];
+                complaintsSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    complaints.push({
+                        id: doc.id,
+                        ...data,
+                        createdAt: data.createdAt
+                    });
+                });
+
+                console.log(`Found ${complaints.length} complaints for student via Firebase user`);
+                updateStudentStats(complaints);
+                displayRecentComplaints(complaints.slice(0, 5));
+                displayAllComplaints(complaints);
+                return;
+            } catch (err) {
+                console.error('Error loading via Firebase user:', err);
+            }
+        }
         return;
     }
-    
-    console.log('Loading complaints for student:', currentStudentUser.uid);
-    
+
     try {
         const complaintsSnapshot = await db.collection('complaints')
             .where('studentId', '==', currentStudentUser.uid)
             .orderBy('createdAt', 'desc')
             .get();
-        
+
         const complaints = [];
         complaintsSnapshot.forEach(doc => {
             const data = doc.data();
-            complaints.push({ 
-                id: doc.id, 
+            complaints.push({
+                id: doc.id,
                 ...data,
-                createdAt: data.createdAt || firebase.firestore.Timestamp.now()
+                createdAt: data.createdAt
             });
         });
-        
+
         console.log(`Found ${complaints.length} complaints for student`);
-        
+
         updateStudentStats(complaints);
         displayRecentComplaints(complaints.slice(0, 5));
         displayAllComplaints(complaints);
-        
+
     } catch (error) {
         console.error('Error loading complaints:', error);
         showToast('Error loading complaints: ' + error.message, 'error');
@@ -58,11 +96,11 @@ function updateStudentStats(complaints) {
     const pending = complaints.filter(c => c.status === 'pending' || c.status === 'unassigned').length;
     const inProgress = complaints.filter(c => c.status === 'in-progress' || c.status === 'assigned').length;
     const resolved = complaints.filter(c => c.status === 'resolved').length;
-    
+
     const pendingEl = document.getElementById('pendingCount');
     const inProgressEl = document.getElementById('inProgressCount');
     const resolvedEl = document.getElementById('resolvedCount');
-    
+
     if (pendingEl) pendingEl.textContent = pending;
     if (inProgressEl) inProgressEl.textContent = inProgress;
     if (resolvedEl) resolvedEl.textContent = resolved;
@@ -70,24 +108,29 @@ function updateStudentStats(complaints) {
 
 function displayRecentComplaints(complaints) {
     const container = document.getElementById('recentComplaintsList');
-    if (!container) return;
-    
+    if (!container) {
+        console.log('recentComplaintsList container not found');
+        return;
+    }
+
+    console.log('Displaying recent complaints:', complaints.length);
+
     if (complaints.length === 0) {
         container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>No complaints yet. Submit your first complaint!</p></div>';
         return;
     }
-    
+
     container.innerHTML = complaints.map(complaint => `
         <div class="complaint-card">
             <div class="complaint-header">
                 <span class="complaint-id">#${complaint.id.slice(-6)}</span>
-                <span class="complaint-priority priority-${complaint.priority}">${complaint.priority.toUpperCase()}</span>
+                <span class="complaint-priority priority-${complaint.priority || 'low'}">${(complaint.priority || 'low').toUpperCase()}</span>
             </div>
-            <div class="complaint-title">${escapeHtml(complaint.title)}</div>
+            <div class="complaint-title">${escapeHtml(complaint.title || 'No Title')}</div>
             <div class="complaint-meta">
                 <span><i class="fas fa-calendar"></i> ${formatDate(complaint.createdAt)}</span>
-                <span><i class="fas fa-tag"></i> ${complaint.category}</span>
-                <span class="complaint-status status-${complaint.status}">${getStatusText(complaint.status)}</span>
+                <span><i class="fas fa-tag"></i> ${complaint.category || 'General'}</span>
+                <span class="complaint-status status-${complaint.status || 'pending'}">${getStatusText(complaint.status || 'pending')}</span>
                 ${complaint.assignedToName ? `<span><i class="fas fa-wrench"></i> Assigned to: ${escapeHtml(complaint.assignedToName)}</span>` : ''}
             </div>
             <div class="complaint-actions">
@@ -100,30 +143,30 @@ function displayRecentComplaints(complaints) {
 function displayAllComplaints(complaints) {
     const container = document.getElementById('allComplaintsList');
     if (!container) return;
-    
+
     const filter = document.getElementById('complaintFilter')?.value || 'all';
     let filtered = complaints;
-    
+
     if (filter !== 'all') {
         filtered = complaints.filter(c => c.status === filter);
     }
-    
+
     if (filtered.length === 0) {
         container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>No complaints found</p></div>';
         return;
     }
-    
+
     container.innerHTML = filtered.map(complaint => `
         <div class="complaint-card">
             <div class="complaint-header">
                 <span class="complaint-id">#${complaint.id.slice(-6)}</span>
-                <span class="complaint-priority priority-${complaint.priority}">${complaint.priority.toUpperCase()}</span>
+                <span class="complaint-priority priority-${complaint.priority || 'low'}">${(complaint.priority || 'low').toUpperCase()}</span>
             </div>
-            <div class="complaint-title">${escapeHtml(complaint.title)}</div>
+            <div class="complaint-title">${escapeHtml(complaint.title || 'No Title')}</div>
             <div class="complaint-meta">
                 <span><i class="fas fa-calendar"></i> ${formatDate(complaint.createdAt)}</span>
-                <span><i class="fas fa-tag"></i> ${complaint.category}</span>
-                <span class="complaint-status status-${complaint.status}">${getStatusText(complaint.status)}</span>
+                <span><i class="fas fa-tag"></i> ${complaint.category || 'General'}</span>
+                <span class="complaint-status status-${complaint.status || 'pending'}">${getStatusText(complaint.status || 'pending')}</span>
                 ${complaint.assignedToName ? `<span><i class="fas fa-wrench"></i> ${escapeHtml(complaint.assignedToName)}</span>` : ''}
             </div>
             <div class="complaint-actions">
@@ -139,47 +182,47 @@ function filterComplaints() {
 
 async function submitComplaint(event) {
     if (event) event.preventDefault();
-    
+
     const category = document.getElementById('complaintCategory').value;
     const title = document.getElementById('complaintTitle').value;
     const description = document.getElementById('complaintDescription').value;
-    
+
     if (!category || !title || !description) {
         showToast('Please fill all required fields', 'error');
         return;
     }
-    
+
     // ACO auto-detects priority - student cannot choose
     const autoPriority = detectAutoPriority(title, description, category);
     const autoRouting = determineAutoRouting(autoPriority, category, description);
-    
+
     const imageFile = document.getElementById('complaintImage')?.files[0];
-    
+
     const user = getCurrentUser();
     if (!user || user.isAdmin) {
         showToast('Please login as a student', 'error');
         return;
     }
-    
+
     const confirmMessage = `🔍 ACO SYSTEM ANALYSIS RESULTS:\n\n` +
         `📋 Issue: ${title}\n` +
         `🏷️ Category: ${category}\n\n` +
         `⚡ ACO Detected Priority: ${getPriorityDisplay(autoPriority)}\n` +
         `📍 Will be routed to: ${getRoutingDisplay(autoRouting)}\n\n` +
         `Click OK to submit complaint.`;
-    
+
     if (!confirm(confirmMessage)) {
         return;
     }
-    
+
     showLoading(true);
-    
+
     try {
         let imageDataUrl = null;
         if (imageFile) {
             imageDataUrl = await readFileAsDataURL(imageFile);
         }
-        
+
         const complaintData = {
             studentId: user.uid,
             studentName: user.fullName,
@@ -189,7 +232,7 @@ async function submitComplaint(event) {
             category: category,
             title: title,
             description: description,
-            priority: autoPriority,  // ACO auto-detected priority
+            priority: autoPriority,
             status: 'pending',
             directToAdmin: autoRouting === 'dsss' || autoRouting === 'dsss_vc',
             autoDetected: true,
@@ -199,17 +242,17 @@ async function submitComplaint(event) {
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             imageDataUrl: imageDataUrl
         };
-        
+
         console.log('Submitting complaint with ACO priority:', autoPriority);
-        
+
         const docRef = await db.collection('complaints').add(complaintData);
-        
+
         console.log('Complaint saved with ID:', docRef.id);
-        
-        const notificationTitle = autoRouting === 'dsss_vc' ? 
-            '🚨 EMERGENCY COMPLAINT - IMMEDIATE ACTION 🚨' : 
+
+        const notificationTitle = autoRouting === 'dsss_vc' ?
+            '🚨 EMERGENCY COMPLAINT - IMMEDIATE ACTION 🚨' :
             'New Complaint Submitted';
-        
+
         await db.collection('notifications').add({
             title: notificationTitle,
             message: `${user.fullName} (${user.roomNumber}) submitted a ${autoPriority.toUpperCase()} priority complaint: ${title.substring(0, 80)}`,
@@ -219,40 +262,33 @@ async function submitComplaint(event) {
             read: false,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        
+
         // ACO will automatically assign technicians (except emergencies)
         if (autoPriority !== 'emergency' && typeof allocateComplaint === 'function') {
             const newComplaint = { id: docRef.id, ...complaintData, zone: user.hostelBlock ? user.hostelBlock.charAt(0) : 'A' };
             await allocateComplaint(newComplaint);
         }
-        
-        const sentTo = getRoutingDisplay(autoRouting);
-        
-        const successModal = document.getElementById('successModal');
-        if (successModal) {
-            const sentToDisplay = successModal.querySelector('#sentToDisplay');
-            if (sentToDisplay) sentToDisplay.textContent = sentTo;
-            successModal.style.display = 'flex';
-        }
-        
+
+        showToast(`✅ Complaint submitted! ACO Priority: ${autoPriority.toUpperCase()}`, 'success');
+
+        // Reset form
         const complaintForm = document.getElementById('complaintForm');
         if (complaintForm) complaintForm.reset();
-        
+
         const fileNameSpan = document.getElementById('fileName');
         if (fileNameSpan) fileNameSpan.textContent = 'No file chosen';
-        
-        showToast(`✅ Complaint submitted! ACO Priority: ${autoPriority.toUpperCase()}`, 'success');
-        
+
+        // Reload complaints after a short delay
         setTimeout(() => {
             loadStudentComplaints();
-        }, 1500);
-        
-        if (typeof loadAllComplaints === 'function') {
-            setTimeout(() => {
+            if (typeof loadAllComplaints === 'function') {
                 loadAllComplaints();
-            }, 2000);
-        }
-        
+            }
+            // Show success modal
+            const successModal = document.getElementById('successModal');
+            if (successModal) successModal.style.display = 'flex';
+        }, 1500);
+
     } catch (error) {
         console.error('Error submitting complaint:', error);
         showToast('Error submitting complaint: ' + error.message, 'error');
@@ -277,15 +313,15 @@ async function viewComplaintDetails(complaintId) {
             showToast('Complaint not found', 'error');
             return;
         }
-        
+
         const complaint = { id: doc.id, ...doc.data() };
-        
+
         const detailsHtml = `
             <div class="complaint-details">
                 <p><strong>Complaint ID:</strong> #${complaint.id.slice(-6)}</p>
                 <p><strong>Title:</strong> ${escapeHtml(complaint.title)}</p>
                 <p><strong>Category:</strong> ${complaint.category}</p>
-                <p><strong>ACO Priority:</strong> <span class="complaint-priority priority-${complaint.priority}">${complaint.priority.toUpperCase()}</span></p>
+                <p><strong>ACO Priority:</strong> <span class="complaint-priority priority-${complaint.priority}">${(complaint.priority || 'low').toUpperCase()}</span></p>
                 ${complaint.autoDetected ? `<p><strong>ACO Analysis:</strong> Priority auto-detected by system</p>` : ''}
                 <p><strong>Status:</strong> <span class="complaint-status status-${complaint.status}">${getStatusText(complaint.status)}</span></p>
                 <p><strong>Description:</strong> ${escapeHtml(complaint.description)}</p>
@@ -295,12 +331,12 @@ async function viewComplaintDetails(complaintId) {
                 ${complaint.imageDataUrl ? `<p><strong>Attached Image:</strong></p><img src="${complaint.imageDataUrl}" style="max-width: 100%; border-radius: 8px; margin-top: 10px;">` : ''}
             </div>
         `;
-        
+
         const modal = document.getElementById('viewModal');
         const detailsDiv = document.getElementById('complaintDetails');
         if (detailsDiv) detailsDiv.innerHTML = detailsHtml;
         if (modal) modal.style.display = 'flex';
-        
+
     } catch (error) {
         console.error('Error viewing complaint:', error);
         showToast('Error loading complaint details', 'error');
@@ -309,20 +345,20 @@ async function viewComplaintDetails(complaintId) {
 
 async function submitEmergency() {
     const issue = document.getElementById('emergencyIssue').value;
-    
+
     if (!issue.trim()) {
         showToast('Please describe the emergency issue', 'error');
         return;
     }
-    
+
     const user = getCurrentUser();
     if (!user || user.isAdmin) {
         showToast('Please login as a student', 'error');
         return;
     }
-    
+
     showLoading(true);
-    
+
     try {
         const complaintData = {
             studentId: user.uid,
@@ -333,7 +369,7 @@ async function submitEmergency() {
             category: 'emergency',
             title: 'EMERGENCY ISSUE - Immediate Attention Required',
             description: issue,
-            priority: 'emergency',  // ACO sets emergency priority
+            priority: 'emergency',
             status: 'pending',
             directToAdmin: true,
             isEmergency: true,
@@ -342,9 +378,9 @@ async function submitEmergency() {
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
-        
+
         const docRef = await db.collection('complaints').add(complaintData);
-        
+
         await db.collection('notifications').add({
             title: '🚨 EMERGENCY COMPLAINT 🚨',
             message: `${user.fullName} from ${user.roomNumber} reported an emergency: ${issue.substring(0, 100)}`,
@@ -353,10 +389,10 @@ async function submitEmergency() {
             read: false,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        
+
         showToast('Emergency complaint sent to DSSS/VC!', 'success');
         closeModal('emergencyModal');
-        
+
         setTimeout(() => {
             showDashboardTab();
             loadStudentComplaints();
@@ -364,7 +400,7 @@ async function submitEmergency() {
                 loadAllComplaints();
             }
         }, 1500);
-        
+
     } catch (error) {
         console.error('Error submitting emergency:', error);
         showToast('Error submitting emergency complaint: ' + error.message, 'error');
@@ -407,7 +443,35 @@ function getStatusText(status) {
     return statusMap[status] || status;
 }
 
-window.refreshComplaints = function() {
+// Fix formatDate to handle Firestore timestamps properly
+function formatDate(timestamp) {
+    if (!timestamp) return 'Just now';
+
+    // Handle Firestore Timestamp
+    if (timestamp && typeof timestamp.toDate === 'function') {
+        const date = timestamp.toDate();
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    }
+
+    // Handle regular Date object or string
+    if (timestamp instanceof Date) {
+        return timestamp.toLocaleDateString() + ' ' + timestamp.toLocaleTimeString();
+    }
+
+    // Handle string or number
+    try {
+        const date = new Date(timestamp);
+        if (!isNaN(date.getTime())) {
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        }
+    } catch (e) {
+        console.error('Date parsing error:', e);
+    }
+
+    return 'Invalid date';
+}
+
+window.refreshComplaints = function () {
     console.log('Manually refreshing complaints...');
     loadStudentComplaints();
     if (typeof loadAllComplaints === 'function') {

@@ -3,10 +3,10 @@
 function showToast(message, type = 'info') {
     const toast = document.getElementById('toast');
     if (!toast) return;
-    
+
     toast.textContent = message;
     toast.className = `toast ${type} show`;
-    
+
     setTimeout(() => {
         toast.classList.remove('show');
     }, 3000);
@@ -14,7 +14,7 @@ function showToast(message, type = 'info') {
 
 function showLoading(show) {
     let loader = document.getElementById('globalLoader');
-    
+
     if (!loader) {
         loader = document.createElement('div');
         loader.id = 'globalLoader';
@@ -33,7 +33,7 @@ function showLoading(show) {
         loader.innerHTML = `<div class="spinner"><i class="fas fa-spinner fa-pulse fa-3x" style="color: white;"></i></div>`;
         document.body.appendChild(loader);
     }
-    
+
     loader.style.display = show ? 'flex' : 'none';
 }
 
@@ -53,23 +53,23 @@ function setupTabs() {
         'students': 'studentsTab',
         'technicians': 'techniciansTab'
     };
-    
+
     menuItems.forEach(item => {
         // Remove any existing event listeners by cloning
         const newItem = item.cloneNode(true);
         item.parentNode.replaceChild(newItem, item);
-        
-        newItem.addEventListener('click', function(e) {
+
+        newItem.addEventListener('click', function (e) {
             e.preventDefault();
             e.stopPropagation();
-            
+
             const tabName = this.getAttribute('data-tab');
             const tabId = tabMap[tabName];
-            
+
             // Update active states
             document.querySelectorAll('.sidebar-menu li').forEach(i => i.classList.remove('active'));
             this.classList.add('active');
-            
+
             // Show the selected tab content
             if (tabId) {
                 document.querySelectorAll('.tab-content').forEach(tab => {
@@ -78,7 +78,7 @@ function setupTabs() {
                 const activeTab = document.getElementById(tabId);
                 if (activeTab) activeTab.classList.add('active');
             }
-            
+
             // Load specific data based on tab
             if (tabName === 'profile' && typeof loadProfile === 'function') loadProfile();
             if (tabName === 'students' && typeof loadStudents === 'function') loadStudents();
@@ -90,17 +90,17 @@ function setupTabs() {
 function setupMobileMenu() {
     const toggleBtn = document.getElementById('mobileMenuToggle');
     const sidebar = document.getElementById('sidebar');
-    
+
     if (toggleBtn && sidebar) {
         toggleBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
             sidebar.classList.toggle('open');
         });
-        
+
         document.addEventListener('click', (e) => {
-            if (sidebar.classList.contains('open') && 
-                !sidebar.contains(e.target) && 
+            if (sidebar.classList.contains('open') &&
+                !sidebar.contains(e.target) &&
                 e.target !== toggleBtn) {
                 sidebar.classList.remove('open');
             }
@@ -114,7 +114,7 @@ function initComplaintForm() {
         form.removeEventListener('submit', submitComplaint);
         form.addEventListener('submit', submitComplaint);
     }
-    
+
     const imageUpload = document.getElementById('complaintImage');
     const fileName = document.getElementById('fileName');
     if (imageUpload && fileName) {
@@ -127,10 +127,10 @@ function initComplaintForm() {
 async function loadProfile() {
     const user = getCurrentUser();
     if (!user) return;
-    
+
     const container = document.getElementById('profileInfo');
     if (!container) return;
-    
+
     if (user.isAdmin) {
         container.innerHTML = `
             <div class="profile-field"><span class="profile-label">Name:</span><span class="profile-value">${escapeHtml(user.fullName)}</span></div>
@@ -153,45 +153,79 @@ function initDashboard() {
     setupTabs();
     setupMobileMenu();
     initComplaintForm();
-    
+
     const currentPage = window.location.pathname;
-    
-    if (currentPage.includes('student-dashboard')) {
+
+    if (currentPage.includes('student-dashboard.html')) {
         const user = getCurrentUser();
+        console.log('Student dashboard init, user:', user);
+
         if (user && !user.isAdmin) {
             const studentNameEl = document.getElementById('studentName');
             const studentRoomBadge = document.getElementById('studentRoomBadge');
             if (studentNameEl) studentNameEl.textContent = user.fullName || 'Student';
             if (studentRoomBadge) studentRoomBadge.textContent = `Room: ${user.roomNumber || '--'}`;
-            
-            if (typeof loadStudentComplaints === 'function') loadStudentComplaints();
-            if (typeof loadProfile === 'function') loadProfile();
-            
+
+            // Force load complaints
+            setTimeout(() => {
+                if (typeof loadStudentComplaints === 'function') {
+                    loadStudentComplaints();
+                }
+                if (typeof loadProfile === 'function') {
+                    loadProfile();
+                }
+            }, 500);
+
             // Real-time updates
             db.collection('complaints')
                 .where('studentId', '==', user.uid)
-                .onSnapshot(() => {
-                    if (typeof loadStudentComplaints === 'function') loadStudentComplaints();
+                .onSnapshot((snapshot) => {
+                    console.log('Real-time update: complaints changed, count:', snapshot.size);
+                    if (typeof loadStudentComplaints === 'function') {
+                        loadStudentComplaints();
+                    }
                 });
+        } else if (auth.currentUser) {
+            // Try to get user from auth
+            console.log('No session user but Firebase user exists, checking...');
+            setTimeout(async () => {
+                const firebaseUser = auth.currentUser;
+                if (firebaseUser) {
+                    const studentDoc = await db.collection('students').doc(firebaseUser.uid).get();
+                    if (studentDoc.exists) {
+                        const studentData = studentDoc.data();
+                        sessionStorage.setItem('currentUser', JSON.stringify({
+                            uid: firebaseUser.uid,
+                            ...studentData,
+                            role: 'student'
+                        }));
+                        location.reload();
+                    }
+                }
+            }, 500);
         }
-    } else if (currentPage.includes('admin-dashboard')) {
-        if (typeof loadAdminDashboard === 'function') {
-            loadAdminDashboard();
-        }
-        
+    } else if (currentPage.includes('admin-dashboard.html')) {
+        console.log('Admin dashboard init');
+        setTimeout(() => {
+            if (typeof loadAdminDashboard === 'function') {
+                loadAdminDashboard();
+            }
+        }, 500);
+
         // Real-time updates for admin
         db.collection('complaints').onSnapshot(() => {
+            console.log('Admin real-time: complaints changed');
             if (typeof loadAllComplaints === 'function') {
                 loadAllComplaints();
             }
         });
-        
+
         db.collection('students').onSnapshot(() => {
             if (typeof loadStudents === 'function') {
                 loadStudents();
             }
         });
-        
+
         db.collection('technicians').onSnapshot(() => {
             if (typeof loadTechnicians === 'function') {
                 loadTechnicians();
@@ -244,17 +278,17 @@ window.formatDate = formatDate;
 window.getCurrentUser = getCurrentUser;
 
 // Debug function
-window.debugCheckComplaints = async function() {
+window.debugCheckComplaints = async function () {
     console.log('=== DEBUG: Checking Complaints ===');
     try {
         const snapshot = await db.collection('complaints').get();
         console.log(`Total complaints in Firestore: ${snapshot.size}`);
-        
+
         snapshot.forEach(doc => {
             const data = doc.data();
             console.log(`- ${doc.id}: ${data.title} (${data.status}) - Student: ${data.studentName}`);
         });
-        
+
         const user = getCurrentUser();
         if (user && !user.isAdmin) {
             const userSnapshot = await db.collection('complaints')
@@ -262,7 +296,7 @@ window.debugCheckComplaints = async function() {
                 .get();
             console.log(`Complaints for current student (${user.uid}): ${userSnapshot.size}`);
         }
-        
+
         return snapshot.size;
     } catch (error) {
         console.error('Debug error:', error);
